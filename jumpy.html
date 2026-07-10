@@ -1,0 +1,3800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Jumpy</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a2b4a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    overflow: hidden;
+    touch-action: none;
+  }
+  #wrap { position: relative; }
+  canvas {
+    border: 6px solid #2c3e50;
+    border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    display: block;
+  }
+  #hud {
+    position: absolute;
+    top: 5px;
+    left: 16px;
+    right: 16px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 20px;
+    font-weight: 800;
+    color: #fff;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.4);
+    pointer-events: none;
+  }
+  #hud span.tag { font-size: 12px; opacity: 0.85; font-weight: 600; display: inline; margin-right: 5px; }
+  #matchClock {
+    align-self: flex-start;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.75);
+    background: rgba(0,0,0,0.25);
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+  #hudLeft {
+    position: absolute;
+    top: 44px;
+    left: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    pointer-events: none;
+    z-index: 3;
+  }
+  #hudRight {
+    position: absolute;
+    top: 44px;
+    right: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+    pointer-events: none;
+    z-index: 3;
+  }
+  #statusRow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 0;
+  }
+  #raceBoard {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  #raceBoard .raceRow {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.85);
+    background: rgba(0,0,0,0.2);
+    padding: 0px 6px;
+    border-radius: 7px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    font-variant-numeric: tabular-nums;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  #raceBoard .raceRow.you {
+    color: #ffe066;
+    background: rgba(255,210,80,0.18);
+    border: 1px solid rgba(255,210,80,0.4);
+  }
+  #raceBoard .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  #pauseBtn {
+    position: absolute;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 30px;
+    font-size: 14px;
+    line-height: 1;
+    color: rgba(255,255,255,0.85);
+    background: rgba(0,0,0,0.28);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 10px;
+    cursor: pointer;
+    z-index: 6;
+    padding: 0;
+  }
+  #pauseBtn:active { background: rgba(255,255,255,0.2); }
+  #raceGoal {
+    position: absolute;
+    top: 26px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 13.5px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: #ffd54f;
+    background: rgba(0,0,0,0.3);
+    padding: 2px 12px;
+    border-radius: 11px;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 4;
+    display: none;
+  }
+  #countdown {
+    position: absolute;
+    top: 34%;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 74px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    background: linear-gradient(180deg, #ffe066, #f7931e);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 3px 8px rgba(0,0,0,0.55));
+    pointer-events: none;
+    z-index: 7;
+    display: none;
+  }
+  #countdown.goalMsg { font-size: 32px; letter-spacing: 2px; }
+  #countdown.pop {
+    display: block;
+    animation: countPop 0.9s ease-out forwards;
+  }
+  @keyframes countPop {
+    0%   { opacity: 0; transform: scale(1.9); }
+    22%  { opacity: 1; transform: scale(1); }
+    80%  { opacity: 1; transform: scale(0.96); }
+    100% { opacity: 0; transform: scale(0.9); }
+  }
+  #pauseOverlay {
+    position: absolute;
+    inset: 6px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10,15,30,0.52);
+    backdrop-filter: blur(1px);
+    border-radius: 9px;
+    z-index: 8;
+  }
+  #pauseOverlay.show { display: flex; }
+  #pauseCard {
+    text-align: center;
+    color: #fff;
+  }
+  #pauseCard h2 {
+    font-size: 34px;
+    letter-spacing: 5px;
+    font-weight: 900;
+    margin-bottom: 8px;
+    background: linear-gradient(180deg, #ffe066, #f7931e);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  #pauseStats { font-size: 13px; margin-bottom: 14px; }
+  #pauseStats .psRow {
+    display: flex;
+    justify-content: space-between;
+    gap: 26px;
+    padding: 2px 0;
+    opacity: 0.9;
+  }
+  #pauseStats .psRow b { color: #ffe066; font-weight: 800; }
+  #pauseStats .psRow span:last-child { font-variant-numeric: tabular-nums; }
+  #livesDisplay {
+    font-size: 11px;
+    letter-spacing: 1px;
+    line-height: 1.2;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4));
+  }
+  #livesDisplay .lostLife { opacity: 0.25; }
+  #flagCounter {
+    font-size: 11px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1.2;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  }
+  #flagBreakdown {
+    display: grid;
+    grid-template-columns: auto auto;
+    gap: 2px 4px;
+    justify-items: end;
+  }
+  #flagBreakdown .flagRow {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(0,0,0,0.22);
+    padding: 1px 7px;
+    border-radius: 8px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    font-variant-numeric: tabular-nums;
+  }
+  .winsTable {
+    margin: 8px auto 4px;
+    min-width: 200px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 10px;
+    padding: 6px 14px 7px;
+    font-size: 12.5px;
+    text-align: left;
+  }
+  .winsTable .wtHead {
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: #ffd54f;
+    padding-bottom: 3px;
+    border-bottom: 1px solid rgba(255,255,255,0.18);
+    margin-bottom: 3px;
+  }
+  .winsTable .wtRow {
+    display: flex;
+    justify-content: space-between;
+    gap: 22px;
+    padding: 1.5px 0;
+    opacity: 0.92;
+  }
+  .winsTable .wtRow.you { color: #ffe066; font-weight: 800; }
+  .winsTable .dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    vertical-align: middle;
+  }
+  #overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 50% 30%, rgba(28,46,84,0.5), rgba(10,15,30,0.64));
+    color: white;
+    text-align: center;
+    border-radius: 8px;
+    z-index: 10;
+  }
+  #overlay.hidden { display: none; }
+  #overlay h1 {
+    font-size: 44px;
+    margin-bottom: 2px;
+    letter-spacing: 4px;
+    background: linear-gradient(180deg, #ffe066, #f7931e);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    animation: titleFloat 2.6s ease-in-out infinite;
+  }
+  @keyframes titleFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+  #menuBadge {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: #ffe9a8;
+    background: rgba(255,210,80,0.14);
+    border: 1px solid rgba(255,210,80,0.45);
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 10px;
+    box-shadow: 0 0 14px rgba(255,200,60,0.25);
+  }
+  .menuTagline { font-size: 14px; margin: 2px 0 12px; opacity: 0.85; }
+  .menuCard {
+    width: 82%;
+    max-width: 300px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 12px;
+    padding: 9px 14px;
+    margin: 5px 0;
+    text-align: left;
+    backdrop-filter: blur(2px);
+  }
+  .cardTitle {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: #ffd54f;
+    margin-bottom: 5px;
+  }
+  .cardRow {
+    font-size: 12.5px;
+    margin: 4px 0;
+    opacity: 0.92;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .cardRow b { color: #7ce8ff; font-weight: 800; }
+  .comboNum {
+    display: inline-block;
+    min-width: 26px;
+    text-align: center;
+    font-weight: 900;
+    font-size: 12px;
+    color: #16233f;
+    background: linear-gradient(180deg, #ffe066, #f7931e);
+    border-radius: 8px;
+    padding: 1px 5px;
+  }
+  #menuStats {
+    margin-top: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.75);
+    letter-spacing: 0.5px;
+  }
+  #modeSelect {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .modeChip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding: 7px 16px;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.8);
+    background: rgba(255,255,255,0.07);
+    border: 1.5px solid rgba(255,255,255,0.2);
+    border-radius: 12px;
+    cursor: pointer;
+  }
+  .modeChip span {
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    opacity: 0.7;
+    text-transform: none;
+  }
+  .modeChip.selected {
+    color: #16233f;
+    background: linear-gradient(180deg, #ffe066, #f7931e);
+    border-color: #ffcc33;
+    box-shadow: 0 0 12px rgba(255,200,60,0.5);
+  }
+  .modeChip.selected span { opacity: 0.85; }
+  #diffSelect {
+    display: none;
+    gap: 6px;
+    margin-top: 7px;
+  }
+  #diffSelect.show { display: flex; }
+  .diffChip {
+    padding: 4px 13px;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.75);
+    background: rgba(255,255,255,0.07);
+    border: 1.5px solid rgba(255,255,255,0.2);
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .diffChip.selected {
+    color: #16233f;
+    background: linear-gradient(180deg, #7ce8ff, #2bb5e0);
+    border-color: #7ce8ff;
+    box-shadow: 0 0 10px rgba(64,196,255,0.5);
+  }
+  #overlay p { font-size: 14px; margin: 5px 0; opacity: 0.85; }
+  #startBtn, #playAgainBtn, #resumeBtn {
+    margin-top: 14px;
+    padding: 12px 34px;
+    font-size: 18px;
+    font-weight: 800;
+    background: linear-gradient(180deg, #ffcc33, #f7931e);
+    border: none;
+    border-radius: 30px;
+    color: #4a2c00;
+    cursor: pointer;
+    box-shadow: 0 4px 0 #b56f00, 0 8px 16px rgba(0,0,0,0.3);
+  }
+  #startBtn {
+    background: linear-gradient(180deg, #52e08a, #17a24e);
+    color: #063d1e;
+    box-shadow: 0 4px 0 #0b6b31, 0 8px 16px rgba(0,0,0,0.3);
+  }
+  #startBtn:active, #playAgainBtn:active, #resumeBtn:active { transform: translateY(2px); box-shadow: 0 2px 0 #b56f00; }
+  #startBtn:active { box-shadow: 0 2px 0 #0b6b31; }
+  #menuBtn, #pauseMenuBtn {
+    margin-top: 10px;
+    padding: 7px 22px;
+    font-size: 13px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.85);
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 20px;
+    cursor: pointer;
+  }
+
+  .touchZone {
+    position: absolute;
+    top: 6px; bottom: 6px;
+    width: calc(50% - 6px);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 22px;
+    background: rgba(255,255,255,0.001);
+    transition: background 0.15s ease;
+    z-index: 2;
+    touch-action: none;
+    overflow: hidden;
+  }
+  .touchZone.left { left: 6px; border-radius: 9px 0 0 9px; }
+  .touchZone.right { right: 6px; border-radius: 0 9px 9px 0; }
+  .touchZone.active { background: rgba(255,255,255,0.14); }
+  .touchZone .arrowIcon {
+    font-size: 38px;
+    color: rgba(255,255,255,0.4);
+    text-shadow: 0 2px 8px rgba(0,0,0,0.35);
+    user-select: none;
+    pointer-events: none;
+    transition: color 0.15s ease, transform 0.15s ease;
+  }
+  .touchZone.active .arrowIcon {
+    color: rgba(255,255,255,0.95);
+    transform: scale(1.2);
+  }
+  .ripple {
+    position: absolute;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.55);
+    pointer-events: none;
+    transform: translate(-50%, -50%) scale(0);
+    animation: rippleAnim 0.55s ease-out forwards;
+  }
+  @keyframes rippleAnim {
+    to { transform: translate(-50%, -50%) scale(9); opacity: 0; }
+  }
+
+  #stormWarning {
+    position: absolute;
+    top: 46px;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: #ffdede;
+    text-shadow: 0 0 8px rgba(255,60,60,0.9);
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    z-index: 3;
+  }
+  #stormWarning.show {
+    opacity: 1;
+    animation: stormPulse 0.9s ease-in-out infinite;
+  }
+  @keyframes stormPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+  }
+
+  #shieldTag {
+    display: none;
+    font-size: 18px;
+    opacity: 0;
+    transform: scale(0.7);
+    transition: opacity 0.2s, transform 0.2s;
+    text-shadow: 0 0 8px rgba(64,196,255,0.9);
+  }
+  #shieldTag.show { display: block; }
+  #shieldTag.show {
+    opacity: 1;
+    transform: scale(1);
+    animation: stormPulse 0.6s ease-in-out infinite;
+  }
+  #rewardBanner {
+    position: absolute;
+    top: 22%;
+    left: 0; right: 0;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 5;
+  }
+  #rewardBanner.show {
+    animation: rewardSlide 2.4s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+  }
+  #rewardFlag {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -54%);
+    font-size: 96px;
+    line-height: 1;
+    opacity: 0.3;
+    filter: drop-shadow(0 4px 10px rgba(0,0,0,0.35));
+  }
+  #rewardText {
+    position: relative;
+    font-size: 26px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    color: #fff;
+    text-shadow: 0 0 14px currentColor, 0 2px 4px rgba(0,0,0,0.6);
+  }
+  #rewardReason {
+    position: relative;
+    margin-top: 5px;
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    color: #fff;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.6);
+  }
+  @keyframes rewardSlide {
+    0%   { opacity: 0; transform: translateY(-46px) scale(0.85); }
+    10%  { opacity: 1; transform: translateY(6px) scale(1.04); }
+    16%  { transform: translateY(0) scale(1); }
+    82%  { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(16px) scale(0.98); }
+  }
+  #multTag {
+    display: none;
+    font-size: 14px;
+    font-weight: 900;
+    color: #16233f;
+    background: linear-gradient(180deg, #7ce8ff, #2bb5e0);
+    padding: 2px 8px;
+    border-radius: 9px;
+    box-shadow: 0 0 10px rgba(64,196,255,0.8);
+    opacity: 0;
+    transform: scale(0.7);
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  #multTag.show { display: block; }
+  #multTag.show {
+    opacity: 1;
+    transform: scale(1);
+    animation: stormPulse 0.7s ease-in-out infinite;
+  }
+  #loader {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: linear-gradient(160deg, #16233f, #1a2b4a 60%, #23355c);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: opacity 0.4s ease;
+  }
+  #loader.fadeOut { opacity: 0; pointer-events: none; }
+  #loaderBall {
+    font-size: 52px;
+    line-height: 1;
+    animation: loaderBounce 0.65s cubic-bezier(0.3, 0, 0.6, 1) infinite alternate;
+    filter: drop-shadow(0 6px 12px rgba(0,0,0,0.45));
+  }
+  @keyframes loaderBounce {
+    0%   { transform: translateY(-42px) scale(1, 1) rotate(-12deg); }
+    85%  { transform: translateY(6px) scale(1.05, 0.95) rotate(8deg); }
+    100% { transform: translateY(10px) scale(1.18, 0.8) rotate(10deg); }
+  }
+  #loaderShadow {
+    width: 46px;
+    height: 9px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.45);
+    animation: loaderShadowPulse 0.65s cubic-bezier(0.3, 0, 0.6, 1) infinite alternate;
+  }
+  @keyframes loaderShadowPulse {
+    0%   { transform: scale(0.55); opacity: 0.35; }
+    100% { transform: scale(1.15); opacity: 0.7; }
+  }
+  #loaderTitle {
+    margin-top: 14px;
+    font-size: 30px;
+    font-weight: 900;
+    letter-spacing: 5px;
+    background: linear-gradient(180deg, #ffe066, #f7931e);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  #loaderBarTrack {
+    width: 170px;
+    height: 6px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.14);
+    overflow: hidden;
+  }
+  #loaderBar {
+    width: 0%;
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #ffcc33, #f7931e);
+    transition: width 0.18s ease;
+  }
+</style>
+</head>
+<body>
+<div id="loader">
+  <div id="loaderBall">⚽</div>
+  <div id="loaderShadow"></div>
+  <div id="loaderTitle">JUMPY</div>
+  <div id="loaderBarTrack"><div id="loaderBar"></div></div>
+</div>
+<div id="wrap">
+  <canvas id="game" width="400" height="600"></canvas>
+  <div id="leftZone" class="touchZone left"><span class="arrowIcon">◀</span></div>
+  <div id="rightZone" class="touchZone right"><span class="arrowIcon">▶</span></div>
+  <div id="stormWarning">⚠ STORM RISING ⚠</div>
+  <div id="rewardBanner">
+    <div id="rewardFlag"></div>
+    <div id="rewardText"></div>
+    <div id="rewardReason"></div>
+  </div>
+  <div id="hud">
+    <div><span class="tag">SCORE</span><span id="score">0</span>
+      <div id="livesDisplay"></div>
+    </div>
+    <div id="matchClock">0:00</div>
+    <div style="text-align:right"><span class="tag">BEST</span><span id="best">0</span>
+      <div id="flagCounter">🚩 0</div>
+    </div>
+  </div>
+  <div id="hudLeft">
+    <div id="statusRow">
+      <div id="shieldTag">🛡</div>
+      <div id="multTag">2×</div>
+    </div>
+    <div id="raceBoard"></div>
+  </div>
+  <div id="hudRight">
+    <div id="flagBreakdown"></div>
+  </div>
+  <button id="pauseBtn" title="Pause">⏸</button>
+  <div id="raceGoal"></div>
+  <div id="countdown"></div>
+  <div id="pauseOverlay">
+    <div id="pauseCard">
+      <h2>PAUSED</h2>
+      <div id="pauseStats"></div>
+      <button id="resumeBtn">RESUME</button>
+      <button id="pauseMenuBtn">Menu</button>
+    </div>
+  </div>
+  <div id="overlay">
+    <div id="menuBadge">⚽ WORLD CUP 2026 EDITION</div>
+    <h1>JUMPY</h1>
+    <p class="menuTagline">Bounce up, don't fall off!</p>
+    <div class="menuCard">
+      <div class="cardTitle">HOW TO PLAY</div>
+      <div class="cardRow"><span>👆</span> Tap left / right side (or arrow keys) to steer</div>
+      <div class="cardRow"><span>🍬</span> Grab candy · 🎁 gifts give a safety shield</div>
+      <div class="cardRow"><span>⛈</span> Outrun the rising storm · ⚽ 3 lives</div>
+    </div>
+    <div class="menuCard">
+      <div class="cardTitle">🚩 FLAG COMBOS</div>
+      <div class="cardRow"><span class="comboNum">3×</span> same flag → <b>+1 LIFE</b></div>
+      <div class="cardRow"><span class="comboNum">5×</span> same flag → <b>🚀 MEGA BOOST</b></div>
+      <div class="cardRow"><span class="comboNum">7×</span> same flag → <b>🥅 GOLDEN GOAL kick</b></div>
+      <div class="cardRow" style="border-top:1px solid rgba(255,255,255,0.14); margin-top:4px; padding-top:5px;"><span class="comboNum">⚡</span> 3 pickups in 3s → <b>HAT-TRICK, 2× score</b></div>
+    </div>
+    <div id="menuStats"></div>
+    <div id="modeSelect">
+      <button class="modeChip selected" data-mode="classic">🏃 CLASSIC<span>endless climb</span></button>
+      <button class="modeChip" data-mode="race">🏁 RACE<span id="raceChipGoal">first to 1000</span></button>
+    </div>
+    <div id="diffSelect">
+      <button class="diffChip" data-diff="easy">EASY</button>
+      <button class="diffChip selected" data-diff="normal">NORMAL</button>
+      <button class="diffChip" data-diff="hard">HARD</button>
+    </div>
+    <button id="startBtn">KICK OFF</button>
+  </div>
+</div>
+
+<script>
+window.addEventListener('error', function(e) {
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#c0392b;color:white;padding:10px;font-family:monospace;font-size:13px;z-index:99999;white-space:pre-wrap;';
+  box.textContent = 'JS Error: ' + e.message + ' (line ' + e.lineno + ', col ' + e.colno + ')';
+  document.body.appendChild(box);
+});
+
+try {
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const scoreEl = document.getElementById('score');
+const bestEl = document.getElementById('best');
+const overlay = document.getElementById('overlay');
+const startBtn = document.getElementById('startBtn');
+
+let keys = { left: false, right: false };
+let running = false;
+let rafId = null;
+
+const ball = {
+  x: W/2, y: H - 100, r: 15,
+  vx: 0, vy: 0,
+  facing: 1
+};
+
+const GRAVITY = 0.28;
+const BOUNCE_VELOCITY = -10.5;
+const MOVE_SPEED = 4.5;
+const PLATFORM_W = 62, PLATFORM_H = 14;
+const FLAG_R = 10;
+const CANDY_R = 9;
+const GIFT_R = 11;
+const CANDY_COLORS = ['#ff6b9d', '#7c4dff', '#40c4ff', '#69f0ae', '#ff8a65'];
+// World Cup 2026 (USA/Canada/Mexico) host-nation colors for confetti and celebration effects
+const WC_COLORS = ['#B22234', '#3C3B6E', '#ffffff', '#006341', '#FF0000'];
+
+// Nations ordered by World Cup achievement (lowest to highest): the 2026 hosts and
+// rising sides first, then semifinalists, finalists, and champions by title count.
+const FLAG_NATIONS = [
+  { name: 'Canada',      emoji: '🇨🇦', pattern: 'vertical',   colors: ['#FF0000', '#f0f0f0', '#FF0000'] },
+  { name: 'USA',         emoji: '🇺🇸', pattern: 'usa' },
+  { name: 'Mexico',      emoji: '🇲🇽', pattern: 'mexico' },
+  { name: 'Japan',       emoji: '🇯🇵', pattern: 'japan' },
+  { name: 'Morocco',     emoji: '🇲🇦', pattern: 'morocco' },
+  { name: 'Portugal',    emoji: '🇵🇹', pattern: 'vertical',   colors: ['#006600', '#FF0000', '#FF0000'] },
+  { name: 'Croatia',     emoji: '🇭🇷', pattern: 'horizontal', colors: ['#FF0000', '#f0f0f0', '#171796'] },
+  { name: 'Netherlands', emoji: '🇳🇱', pattern: 'horizontal', colors: ['#AE1C28', '#f0f0f0', '#21468B'] },
+  { name: 'England',     emoji: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', pattern: 'cross',      bg: '#f0f0f0', accent: '#CE1124' },
+  { name: 'Spain',       emoji: '🇪🇸', pattern: 'horizontal', colors: ['#AA151B', '#F1BF00', '#AA151B'], weights: [1, 2, 1] },
+  { name: 'Uruguay',     emoji: '🇺🇾', pattern: 'stripes4',   colors: ['#f0f0f0', '#0038A8'] },
+  { name: 'France',      emoji: '🇫🇷', pattern: 'vertical',   colors: ['#0055A4', '#f0f0f0', '#EF4135'] },
+  { name: 'Argentina',   emoji: '🇦🇷', pattern: 'horizontal', colors: ['#74ACDF', '#f0f0f0', '#74ACDF'] },
+  { name: 'Germany',     emoji: '🇩🇪', pattern: 'horizontal', colors: ['#1a1a1a', '#DD0000', '#FFCE00'] },
+  { name: 'Italy',       emoji: '🇮🇹', pattern: 'vertical',   colors: ['#009246', '#f0f0f0', '#CE2B37'] },
+  { name: 'Brazil',      emoji: '🇧🇷', pattern: 'brazil' }
+];
+
+let platforms = [];
+let flags = [];
+let candies = [];
+let gifts = [];
+let particles = [];
+let confetti = [];
+let popups = [];
+let clouds = [];
+let hills = [];
+let score = 0;
+let best = 0;
+let cameraY = 0;
+let wasMoving = false;
+let deathReason = 'fall';
+let celebratedNewBest = false;
+let bestAtRunStart = 0;
+let shieldActive = false;
+let shieldTimer = 0;
+const SHIELD_DURATION = 420; // frames (~7s at 60fps)
+const BARRIER_OFFSET = 10;
+let matchStartTime = 0;
+let bestTimeMs = 0;
+let bestHeight = 0;
+let paused = false;
+let pausedAt = 0;
+const pauseOverlayEl = document.getElementById('pauseOverlay');
+const pauseStatsEl = document.getElementById('pauseStats');
+
+function togglePause() {
+  if (!running) return; // only pausable mid-match
+  paused = !paused;
+  if (paused) {
+    pausedAt = Date.now();
+    const distM = Math.round(cameraY / 10);
+    let rows =
+      '<div class="psRow"><b>Score</b><span>' + score + ' · best ' + Math.max(best, score) + '</span></div>' +
+      '<div class="psRow"><b>Distance</b><span>' + distM + 'm · best ' + Math.max(bestHeight, distM) + 'm</span></div>' +
+      '<div class="psRow"><b>Time</b><span>' + formatMatchTime(pausedAt - matchStartTime) + ' · best ' + formatMatchTime(Math.max(bestTimeMs, pausedAt - matchStartTime)) + '</span></div>' +
+      '<div class="psRow"><b>Flags</b><span>🚩 ' + flagsCollectedCount + '</span></div>' +
+      '<div class="psRow"><b>Lives</b><span>' + (gameMode === 'race' ? '⚽ ∞' : '⚽'.repeat(lives)) + '</span></div>';
+    if (gameMode === 'race') {
+      const st = raceStandings();
+      const place = st.findIndex(function(e) { return e.you; }) + 1;
+      rows += '<div class="psRow"><b>Race</b><span>' + place + ' of ' + st.length + ' · 🎯 ' + raceTarget + '</span></div>';
+    }
+    pauseStatsEl.innerHTML = rows;
+    pauseOverlayEl.classList.add('show');
+    keys.left = false; keys.right = false;
+    playWhistle(false);
+  } else {
+    // exclude paused time from the match clock
+    matchStartTime += Date.now() - pausedAt;
+    // if paused during a GOLDEN GOAL, shift its anchor too so the span isn't counted twice
+    if (goalGame.active) goalPausedAt += Date.now() - pausedAt;
+    pauseOverlayEl.classList.remove('show');
+    playWhistle(false);
+  }
+}
+let celebratedChampion = false;
+let trophyTimer = 0; // frames remaining to show the floating trophy
+
+// --- Lives & flag collection tracking ---
+const MAX_LIVES = 5;
+let lives = 3;
+let flagsCollectedCount = 0;
+let flagCountsByCountry = {}; // countryIdx -> count; every 3 of the same country = +1 life
+let reviveGraceTimer = 0;     // brief invulnerable window after a revive
+let ballTrail = [];           // recent ball positions for the motion trail
+let boostTimer = 0;           // frames of mega-boost flight remaining
+let boostsQueued = 0;         // GOLDEN GOAL prize: chained mega boosts
+let goalPendingCount = 0;     // GOLDEN GOALs earned (7 same flags each)
+let goalGame = { active: false };
+let goalPausedAt = 0;
+
+// --- Bot racers: three AI opponents climbing the same board against you ---
+const BOT_CONFIG = [
+  { name: 'Jumpinho',    emoji: '🇧🇷', color: '#2ecc71', steer: 4.3, errPx: 27, reactFrames: 21, blunder: 0.028 },
+  { name: 'Sir Offside', emoji: '🇺🇸', color: '#4aa3ff', steer: 4.5, errPx: 19, reactFrames: 16, blunder: 0.020 },
+  { name: 'El Nutmeg',   emoji: '🇲🇽', color: '#ff6b6b', steer: 4.0, errPx: 35, reactFrames: 27, blunder: 0.038 }
+];
+let bots = [];
+let recentScroll = 0; // decaying measure of how fast the camera is climbing
+let botScrollDebt = 0; // camera scroll gained during YOUR boosts — never credited to bots
+
+// --- Game modes: CLASSIC endless survival, or RACE first-to-target against the bots ---
+let gameMode = 'classic';
+let raceDifficulty = 'normal';
+
+// Bot skill presets per race difficulty (multipliers over each bot's base config)
+const DIFF_PRESETS = {
+  easy:   { steer: 0.93, err: 1.30, react: 1.30, blunder: 1.50, ahead: 0.62, rubber: 0   },
+  normal: { steer: 1.00, err: 1.00, react: 1.00, blunder: 1.00, ahead: 0.78, rubber: 0.6 },
+  hard:   { steer: 1.08, err: 0.70, react: 0.72, blunder: 0.60, ahead: 0.95, rubber: 1   }
+};
+
+// Rubber-banding: bots trailing the player push harder, bots leading ease off,
+// keeping races tight. Strength scales with difficulty (none on easy).
+function rubberBandFactor(b) {
+  const strength = DIFF_PRESETS[raceDifficulty].rubber;
+  if (!strength || gameMode !== 'race') return 1;
+  const gap = score - Math.max(0, b.bestClimb + b.flagPoints); // positive = bot is behind
+  if (gap > 0) return 1 + Math.min(0.28, gap / 1100) * strength;
+  return 1 - Math.min(0.22, -gap / 1400) * strength;
+}
+let raceTarget = 1000; // climb score to win the race; increases each time you win
+let raceWins = {};     // session-wide win tally per racer, shown after every race
+let raceOver = false;
+let raceCountdown = 0;       // frames of pre-race countdown remaining
+let prevLeaderName = '';     // for overtake notifications
+let leadChangeCooldown = 0;  // throttle for lead-change popups
+let finalStretchShown = false;
+
+function initBots() {
+  // Bots are rivals for RACE mode only — classic is a pure solo climb
+  if (gameMode !== 'race') { bots = []; return; }
+  const P = DIFF_PRESETS[raceDifficulty];
+  bots = BOT_CONFIG.map(function(cfg, i) {
+    return {
+      name: cfg.name, emoji: cfg.emoji, color: cfg.color,
+      steer: cfg.steer * P.steer,
+      errPx: cfg.errPx * P.err,
+      reactFrames: Math.round(cfg.reactFrames * P.react),
+      blunder: cfg.blunder * P.blunder,
+      x: W * (0.25 + i * 0.25), y: H - 100,
+      vx: 0, vy: BOUNCE_VELOCITY,
+      targetX: W / 2, reactT: Math.floor(Math.random() * 20),
+      bestClimb: 0, falls: 0,
+      lives: 3, grace: 0, eliminated: false,
+      flagCounts: {}, id: i,
+      targetPlatform: null, curErr: 0,
+      ahead: false, virtualLead: 0, flagPoints: 0,
+      penaltyT: 0, pendingBoosts: 0,
+      aheadRate: P.ahead * (cfg.steer / 4.4) // climb speed while out of view above
+    };
+  });
+}
+
+function botLoseLife(b) {
+  // endless lives for everyone — a genuine misjump costs POINTS
+  b.falls++;
+  b.flagPoints -= RACE_FALL_PENALTY;
+  addPopup(b.name + ' -' + RACE_FALL_PENALTY, W / 2, 90, b.color);
+  // revive on a lower-area platform (behind the player) with a grace period —
+  // but always safely above the storm line to avoid instant re-capture
+  let spots = platforms.filter(function(p) { return p.y > H * 0.55 && p.y < H * 0.88 && p.y < stormY - 130; });
+  if (!spots.length) spots = platforms.filter(function(p) { return p.y < stormY - 130 && p.y > 40; });
+  const spot = spots.length
+    ? spots[Math.floor(Math.random() * spots.length)]
+    : platforms.reduce(function(a, c) { return a.y < c.y ? a : c; });
+  b.x = spot.x + spot.w / 2;
+  b.y = spot.y - 13;
+  b.vy = BOUNCE_VELOCITY;
+  b.grace = 90;
+  b.reactT = 0; // reassess immediately from the new position
+  b.targetPlatform = null;
+}
+
+function updateBots() {
+  for (const b of bots) {
+    if (b.eliminated) continue;
+
+    // AHEAD mode: the bot has out-climbed the visible window and keeps racing
+    // upward on its own, independent of the player's camera
+    // your rocket is YOUR moment: rivals' point gains freeze while you boost
+    const gainsFrozen = boostTimer > 0;
+    if (b.ahead) {
+      if (b.penaltyT > 0) {
+        b.penaltyT--;
+        if (b.penaltyT === 0) {
+          const scores = Math.random() < (0.7 - b.blunder * 5);
+          if (scores) {
+            addPopup('⚽ ' + b.name + ' SCORES! 🚀', W / 2, 120, '#ffd54f');
+            playCrowdRoar(0.9, 0.06);
+            b.virtualLead += 520; // triple-boost worth of lead
+          } else {
+            addPopup('🧤 ' + b.name + ' — SAVED!', W / 2, 120, '#cfd8e3');
+          }
+        }
+      }
+      if (!gainsFrozen) b.virtualLead += b.aheadRate * rubberBandFactor(b);
+      // occasional virtual stumble so leads aren't a flawless escalator
+      if (Math.random() < 0.008) {
+        b.virtualLead = Math.max(0, b.virtualLead - randRange(80, 200));
+      }
+      if (!gainsFrozen) b.bestClimb = Math.max(b.bestClimb, heightPointsFromPx(Math.max(0, cameraY - botScrollDebt + (H + 14) + b.virtualLead - 100)));
+      continue;
+    }
+
+    if (b.grace > 0) b.grace--;
+
+    // bot penalty kick: brief suspense, then a skill-based verdict
+    if (b.penaltyT > 0) {
+      b.penaltyT--;
+      if (b.penaltyT === 0) {
+        const scores = Math.random() < (0.7 - b.blunder * 5);
+        if (scores) {
+          addPopup('⚽ ' + b.name + ' SCORES! 🚀', W / 2, 120, '#ffd54f');
+          playCrowdRoar(0.9, 0.06);
+          b.pendingBoosts = 3; // same triple mega boost prize
+        } else {
+          addPopup('🧤 ' + b.name + ' — SAVED!', W / 2, 120, '#cfd8e3');
+        }
+      }
+    }
+    // chained penalty-prize launches: fire on each descent
+    if (b.pendingBoosts > 0 && b.vy > 0) {
+      b.vy = -20;
+      b.grace = Math.max(b.grace, 45);
+      b.pendingBoosts--;
+    }
+
+    // rubber-band applies gently to on-screen speed too (clamped so physics stay sane)
+    const effSteer = b.steer * Math.max(0.92, Math.min(1.12, rubberBandFactor(b)));
+
+    // --- Smart target selection ---
+    // Estimate frames for the bot to rise dh pixels after a bounce (v0 = |BOUNCE_VELOCITY|)
+    function timeToRise(dh) {
+      const v0 = -BOUNCE_VELOCITY;
+      const disc = v0 * v0 - 2 * GRAVITY * dh;
+      if (disc <= 0) return null; // above max jump height
+      return (v0 - Math.sqrt(disc)) / GRAVITY;
+    }
+
+    const stormNear = (stormY - b.y) < 220; // panic mode: prioritize pure height
+
+    b.reactT--;
+    if (b.reactT <= 0) {
+      b.reactT = (stormNear ? Math.ceil(b.reactFrames * 0.5) : b.reactFrames) + Math.floor(Math.random() * 8);
+      const candidates = [];
+      for (const p of platforms) {
+        const dh = b.y - p.y;
+        if (dh < 10 || dh > 190) continue; // below, or beyond max jump height
+        const t = timeToRise(dh);
+        if (t === null) continue;
+        // predict where a moving platform will be when the bot arrives
+        let px = p.x;
+        if (p.moving) {
+          px = p.x + p.dir * p.speed * t;
+          if (px < 5) px = 5;
+          if (px + p.w > W - 5) px = W - 5 - p.w;
+        }
+        const center = px + p.w / 2;
+        const dx = Math.abs(center - b.x);
+        // reachability: can the bot cover dx horizontally within the airtime (plus slack)?
+        if (dx > effSteer * (t + 16)) continue;
+        let s = dh * (stormNear ? 2.2 : 1.0)         // height gain (heavily weighted in a storm panic)
+              + p.w * 0.6                            // wider = safer landing
+              - (p.moving ? 16 : 0)                  // moving platforms are riskier
+              - dx * 0.10                            // closer is easier
+              - Math.abs(center - W / 2) * 0.04;     // mild preference away from walls
+        candidates.push({ p: p, center: center, score: s });
+      }
+      if (candidates.length) {
+        candidates.sort(function(c1, c2) { return c2.score - c1.score; });
+        let pick = candidates[0];
+        if (Math.random() < b.blunder && candidates.length > 1) {
+          pick = candidates[Math.floor(Math.random() * candidates.length)]; // blunder: suboptimal choice
+        }
+        b.targetPlatform = pick.p;
+        b.curErr = randRange(-b.errPx, b.errPx) * (stormNear ? 0.5 : 1); // focus under pressure
+        b.targetX = pick.center + b.curErr;
+      } else {
+        b.targetPlatform = null;
+      }
+    }
+
+    // continuously track a moving target platform between decisions
+    if (b.targetPlatform && b.targetPlatform.moving) {
+      b.targetX = b.targetPlatform.x + b.targetPlatform.w / 2 + b.curErr;
+    }
+
+    // steer toward target
+    if (b.x < b.targetX - 6) b.vx = effSteer;
+    else if (b.x > b.targetX + 6) b.vx = -effSteer;
+    else b.vx = 0;
+
+    b.x += b.vx;
+    if (b.x < 10) b.x = 10;
+    if (b.x > W - 10) b.x = W - 10;
+
+    b.vy += GRAVITY;
+    b.y += b.vy;
+
+    // bounce on platforms (same rules as the player)
+    if (b.vy > 0) {
+      for (const p of platforms) {
+        if (
+          b.x + 7 > p.x && b.x - 7 < p.x + p.w &&
+          b.y + 11 > p.y && b.y + 11 < p.y + PLATFORM_H + 10
+        ) {
+          b.vy = BOUNCE_VELOCITY;
+          break;
+        }
+      }
+    }
+
+    // ghost flag collection: bots tally flags for their own combos without
+    // taking them off the board (the player's pickups are never stolen)
+    for (const f of flags) {
+      if (gainsFrozen) break; // no ghost-flag points during your boost either
+      if (f.collected) continue;
+      if (!f.takenBy) f.takenBy = {};
+      if (f.takenBy[b.id]) continue;
+      const dx = b.x - f.x, dy2 = b.y - f.y;
+      if (Math.sqrt(dx*dx + dy2*dy2) < 11 + FLAG_R) {
+        f.takenBy[b.id] = true;
+        b.flagPoints += 10;
+        b.flagCounts[f.countryIdx] = (b.flagCounts[f.countryIdx] || 0) + 1;
+        const c = b.flagCounts[f.countryIdx];
+        if (c % 3 === 0 && b.lives < MAX_LIVES) {
+          b.lives++; // same 3-of-a-kind rule as the player
+        }
+        if (c % 5 === 0 && c % 7 !== 0) {
+          b.vy = -20; // same 5-of-a-kind mega boost
+          b.grace = Math.max(b.grace, 60);
+        }
+        if (c % 7 === 0 && b.penaltyT <= 0) {
+          // 10 same flags: the bot steps up for its own penalty kick
+          b.penaltyT = 85;
+          addPopup('🥅 ' + b.name + ' steps up…', W / 2, 120, b.color);
+          playWhistle(false);
+        }
+      }
+    }
+
+    // out-climbed the view: switch to independent ahead-mode climbing
+    // (threshold sits past the edge so the boundary can't oscillate)
+    if (b.y < -28) {
+      b.ahead = true;
+      b.virtualLead = -14 - b.y;
+      b.y = -28;
+      continue;
+    }
+
+    // same death rules as the player: falling or the storm costs a life —
+    // but losing ground because the PLAYER is rushing isn't the bot's misjump:
+    // they respawn without losing a life (though they lose progress)
+    const pacedOut = recentScroll > 40;
+    if (b.y > H + 50 || (b.grace <= 0 && b.y + 11 > stormY)) {
+      if (pacedOut) {
+        let spots = platforms.filter(function(p) { return p.y > H * 0.55 && p.y < H * 0.88 && p.y < stormY - 130; });
+        if (!spots.length) spots = platforms.filter(function(p) { return p.y < stormY - 130 && p.y > 40; });
+        const spot = spots.length
+          ? spots[Math.floor(Math.random() * spots.length)]
+          : platforms.reduce(function(a, c) { return a.y < c.y ? a : c; });
+        b.x = spot.x + spot.w / 2;
+        b.y = spot.y - 13;
+        b.vy = BOUNCE_VELOCITY;
+        b.grace = Math.max(b.grace, 45);
+        b.reactT = 0;
+        b.targetPlatform = null;
+      } else {
+        botLoseLife(b);
+      }
+    }
+
+    if (!gainsFrozen) {
+      b.bestClimb = Math.max(b.bestClimb, heightPointsFromPx(Math.max(0, cameraY - botScrollDebt + (H - b.y) - 100)));
+    }
+  }
+}
+
+function playerClimbScore() {
+  return Math.round((cameraY + (H - ball.y)) / 10);
+}
+
+function raceStandings() {
+  // the race is decided by SCORE: height points + pickups (bots earn ghost-flag points)
+  const entries = bots.map(function(b) {
+    return { name: b.name, emoji: b.emoji, color: b.color, climb: Math.max(0, b.bestClimb + b.flagPoints), you: false, falls: b.falls, out: false };
+  });
+  entries.push({ name: 'YOU', emoji: '⚽', color: '#ffe066', climb: score, you: true, falls: playerFalls, out: false });
+  entries.sort(function(a, c) {
+    if (c.climb !== a.climb) return c.climb - a.climb;
+    return a.you ? -1 : (c.you ? 1 : 0); // ties (e.g. 0–0 at kickoff) favor the player
+  });
+  return entries;
+}
+
+let raceBoardT = 0;
+let raceLeaderName = '';
+let raceRanks = {};
+function rankLabel(rank) {
+  return rank === 1 ? '🏆' : rank === 2 ? '2nd' : rank === 3 ? '3rd' : rank + 'th';
+}
+function updateRaceLeader() {
+  if (gameMode !== 'race' || !bots.length) { raceLeaderName = ''; raceRanks = {}; return; }
+  const st = raceStandings();
+  raceLeaderName = st[0].name;
+  raceRanks = {};
+  st.forEach(function(e, i) { raceRanks[e.name] = i + 1; });
+  if (leadChangeCooldown > 0) leadChangeCooldown--;
+  // overtake notification when the lead changes hands
+  if (prevLeaderName && raceLeaderName !== prevLeaderName && leadChangeCooldown <= 0 && !raceOver) {
+    leadChangeCooldown = 150; // ~2.5s throttle
+    if (raceLeaderName === 'YOU') {
+      addPopup('🏆 YOU TAKE THE LEAD!', W / 2, H * 0.3, '#ffe066');
+      playAirHorn(false);
+    } else {
+      const bot = bots.find(function(b) { return b.name === raceLeaderName; });
+      addPopup(raceLeaderName + ' takes the lead', W / 2, H * 0.3, bot ? bot.color : '#fff');
+      beep({ freq: 220, duration: 0.18, type: 'sawtooth', volume: 0.1, filterFreq: 900 });
+    }
+  }
+  prevLeaderName = raceLeaderName;
+}
+function renderRaceBoard() {
+  raceBoardT++;
+  if (raceBoardT % 15 !== 0) return; // update ~4x per second
+  const boardEl = document.getElementById('raceBoard');
+  if (gameMode !== 'race') { if (boardEl.innerHTML) boardEl.innerHTML = ''; return; }
+  const entries = raceStandings();
+  let html = '';
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    const status = e.falls > 0 ? ' ↓' + e.falls : '';
+    const rank = i === 0 ? '🏆' : (i + 1) + '.';
+    html += '<div class="raceRow' + (e.you ? ' you' : '') + '">' +
+      rank + ' <span class="dot" style="background:' + e.color + '"></span>' +
+      e.name + ' ' + e.climb + status + '</div>';
+  }
+  document.getElementById('raceBoard').innerHTML = html;
+}
+
+// --- Reward indication effects: banner pop + brief screen flash ---
+let flashTimer = 0;
+let flashColor = '255,255,255';
+const rewardBannerEl = document.getElementById('rewardBanner');
+const rewardFlagEl = document.getElementById('rewardFlag');
+const rewardTextEl = document.getElementById('rewardText');
+const rewardReasonEl = document.getElementById('rewardReason');
+let bannerBusyUntil = 0;
+function showReward(text, cssColor, flashRgb, flagEmoji, reason) {
+  const now = Date.now();
+  const delay = Math.max(0, bannerBusyUntil - now);
+  bannerBusyUntil = now + delay + 2200;
+  setTimeout(function() {
+    rewardTextEl.textContent = text;
+    rewardTextEl.style.color = cssColor;
+    rewardFlagEl.textContent = flagEmoji || '';
+    rewardReasonEl.textContent = reason || '';
+    rewardBannerEl.classList.remove('show');
+    void rewardBannerEl.offsetWidth; // restart the CSS animation
+    rewardBannerEl.classList.add('show');
+    flashColor = flashRgb;
+    flashTimer = 16;
+  }, delay);
+}
+
+// --- HAT-TRICK reward: collect 3 items within 3 seconds -> 2x score for 10 seconds ---
+const HAT_TRICK_WINDOW_MS = 3000;
+const MULTIPLIER_DURATION = 600; // frames (~10s)
+let recentPickupTimes = [];
+let scoreMultiplier = 1;
+let multiplierTimer = 0;
+const multTagEl = document.getElementById('multTag');
+
+function registerPickup() {
+  const now = Date.now();
+  recentPickupTimes.push(now);
+  recentPickupTimes = recentPickupTimes.filter(function(t) { return now - t <= HAT_TRICK_WINDOW_MS; });
+  if (recentPickupTimes.length >= 3 && scoreMultiplier === 1) {
+    recentPickupTimes = [];
+    scoreMultiplier = 2;
+    multiplierTimer = MULTIPLIER_DURATION;
+    multTagEl.classList.add('show');
+    showReward('HAT-TRICK! 2× SCORE', '#7ce8ff', '64,196,255',
+      '⚽', '⚽ × 3 in 3s');
+    addConfetti(ball.x, ball.y - 20, 24);
+    playAirHorn(false);
+    playCrowdRoar(1.0, 0.09);
+  }
+}
+const matchClockEl = document.getElementById('matchClock');
+const livesDisplayEl = document.getElementById('livesDisplay');
+const flagCounterEl = document.getElementById('flagCounter');
+function renderLives() {
+  if (gameMode === 'race') {
+    livesDisplay.innerHTML = '⚽ ∞';
+    return;
+  }
+  let html = '';
+  for (let i = 0; i < Math.max(lives, 3); i++) {
+    html += i < lives ? '⚽' : '<span class="lostLife">⚽</span>';
+  }
+  livesDisplayEl.innerHTML = html;
+}
+function renderFlagCounter() {
+  flagCounterEl.textContent = '🚩 ' + flagsCollectedCount;
+  const breakdownEl = document.getElementById('flagBreakdown');
+  // show only the top 6 nations (by count) to keep the play area clear
+  const entries = [];
+  for (let i = 0; i < FLAG_NATIONS.length; i++) {
+    const count = flagCountsByCountry[i] || 0;
+    if (count > 0) entries.push({ emoji: FLAG_NATIONS[i].emoji, count: count });
+  }
+  entries.sort(function(a, b) { return b.count - a.count; });
+  let html = '';
+  for (let i = 0; i < Math.min(6, entries.length); i++) {
+    html += '<div class="flagRow">' + entries[i].emoji + ' ' + entries[i].count + '</div>';
+  }
+  if (entries.length > 6) {
+    html += '<div class="flagRow" style="opacity:0.6">+' + (entries.length - 6) + ' more</div>';
+  }
+  breakdownEl.innerHTML = html;
+}
+function formatMatchTime(ms) {
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+// --- Rising storm: a chasing hazard that punishes stalling and ramps up the challenge ---
+let stormY = 0;
+let stormWarned = false;
+let stormPulseT = 0;
+const stormWarning = document.getElementById('stormWarning');
+const shieldTag = document.getElementById('shieldTag');
+
+// --- Sound engine (procedural, no audio files needed) ---
+let audioCtx = null;
+function ensureAudio() {
+  try {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(function(){});
+    }
+  } catch (e) { /* audio unsupported, fail silently */ }
+}
+
+// Core tone generator with a gentle lowpass filter for a softer, less harsh timbre.
+function beep(opts) {
+  if (!audioCtx) return;
+  try {
+    const now = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = opts.filterFreq || 4000;
+    osc.type = opts.type || 'sine';
+    osc.frequency.setValueAtTime(opts.freq, now);
+    if (opts.freqEnd) osc.frequency.exponentialRampToValueAtTime(opts.freqEnd, now + opts.duration);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(opts.volume || 0.15, now + (opts.attack || 0.008));
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + opts.duration);
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + opts.duration + 0.02);
+  } catch (e) { /* fail silently */ }
+}
+
+// Schedule a short melodic sequence of notes (frequencies in Hz) with a fixed gap.
+function chime(freqs, opts) {
+  opts = opts || {};
+  freqs.forEach(function(f, i) {
+    setTimeout(function() {
+      beep({
+        freq: f, freqEnd: opts.freqEnd ? f * opts.freqEnd : null,
+        duration: opts.duration || 0.14, type: opts.type || 'sine',
+        volume: opts.volume || 0.15, filterFreq: opts.filterFreq
+      });
+    }, i * (opts.gap || 55));
+  });
+}
+
+function playJumpSound() {
+  playKickThud();
+}
+
+// Realistic football "kick" sound: a short burst of lowpassed noise (the leather
+// impact) layered over a quick low-frequency punch (the thump you feel)
+function playKickThud() {
+  if (!audioCtx) return;
+  try {
+    const now = audioCtx.currentTime;
+    // noise burst for the leather contact
+    const dur = 0.08;
+    const bufferLen = Math.floor(audioCtx.sampleRate * dur);
+    const buffer = audioCtx.createBuffer(1, bufferLen, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferLen; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufferLen);
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 600;
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.35, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+    src.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+    src.start(now); src.stop(now + dur);
+    // low thump underneath
+    beep({ freq: 85, freqEnd: 45, duration: 0.1, type: 'sine', volume: 0.22, attack: 0.002 });
+  } catch (e) { /* fail silently */ }
+}
+
+// Stadium air horn for the big moments
+function playAirHorn(long) {
+  const dur = long ? 0.7 : 0.35;
+  beep({ freq: 233, freqEnd: 246, duration: dur, type: 'sawtooth', volume: 0.14, filterFreq: 1400, attack: 0.02 });
+  beep({ freq: 466, freqEnd: 492, duration: dur, type: 'sawtooth', volume: 0.07, filterFreq: 2200, attack: 0.02 });
+}
+function playMoveSound(dir) {
+  const base = dir === 'left' ? 210 : 240;
+  beep({ freq: base, freqEnd: base * 0.75, duration: 0.045, type: 'triangle', volume: 0.055 });
+}
+function playStarSound() {
+  chime([880, 1108, 1318], { duration: 0.16, gap: 50, type: 'sine', volume: 0.15, filterFreq: 5000 });
+  playCrowdRoar(0.5, 0.04);
+}
+function playCandySound() {
+  chime([660, 990], { duration: 0.14, gap: 70, type: 'sine', volume: 0.14, filterFreq: 4500 });
+}
+function playGameOverSound() {
+  chime([440, 349, 262], { duration: 0.24, gap: 130, type: 'sawtooth', volume: 0.14, filterFreq: 1800 });
+}
+function playStormAlertSound() {
+  beep({ freq: 90, freqEnd: 55, duration: 0.5, type: 'sawtooth', volume: 0.13, filterFreq: 700 });
+}
+function playGoalFanfare() {
+  // triumphant ascending fanfare for beating your best score, World-Cup-goal style
+  chime([523, 659, 784, 1047], { duration: 0.22, gap: 90, type: 'triangle', volume: 0.18, filterFreq: 5500 });
+  setTimeout(function(){ beep({ freq: 784, duration: 0.35, type: 'sawtooth', volume: 0.08, filterFreq: 2000 }); }, 380);
+  playCrowdRoar(1.2, 0.1);
+}
+function playGiftSound() {
+  chime([392, 523, 659, 880], { duration: 0.15, gap: 45, type: 'sine', volume: 0.16, filterFreq: 6000 });
+}
+function playShieldExpireSound() {
+  beep({ freq: 500, freqEnd: 220, duration: 0.25, type: 'triangle', volume: 0.1, filterFreq: 3000 });
+}
+function playWhistle(long) {
+  // referee whistle: bright, narrow-band tone with a slight warble
+  const dur = long ? 0.5 : 0.22;
+  beep({ freq: 2200, freqEnd: 2350, duration: dur, type: 'square', volume: 0.1, filterFreq: 3200, attack: 0.01 });
+  if (long) {
+    setTimeout(function(){
+      beep({ freq: 2200, freqEnd: 2350, duration: 0.22, type: 'square', volume: 0.1, filterFreq: 3200, attack: 0.01 });
+    }, 260);
+    setTimeout(function(){
+      beep({ freq: 2200, freqEnd: 2350, duration: 0.6, type: 'square', volume: 0.11, filterFreq: 3200, attack: 0.01 });
+    }, 520);
+  }
+}
+function playChampionFanfare() {
+  // biggest celebration in the game: reaching the most decorated nation's tier
+  chime([523, 659, 784, 988, 1175], { duration: 0.26, gap: 100, type: 'triangle', volume: 0.2, filterFreq: 6000 });
+  setTimeout(function(){ chime([784, 988, 1175], { duration: 0.35, gap: 120, type: 'sawtooth', volume: 0.12, filterFreq: 2500 }); }, 560);
+  playCrowdRoar(1.8, 0.14);
+}
+
+// Crowd roar: filtered white noise that swells and fades, like a stadium erupting
+function playCrowdRoar(duration, volume) {
+  if (!audioCtx) return;
+  try {
+    const now = audioCtx.currentTime;
+    const bufferLen = Math.floor(audioCtx.sampleRate * duration);
+    const buffer = audioCtx.createBuffer(1, bufferLen, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferLen; i++) {
+      data[i] = (Math.random() * 2 - 1);
+    }
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 900;
+    filter.Q.value = 0.6;
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(volume, now + duration * 0.25); // swell
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);        // fade
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    src.start(now);
+    src.stop(now + duration);
+  } catch (e) { /* fail silently */ }
+}
+
+function randRange(a,b){ return a + Math.random()*(b-a); }
+function isFiniteNum(n){ return typeof n === 'number' && isFinite(n); }
+function clamp01(n){ return Math.max(0, Math.min(1, n)); }
+
+// Difficulty ramps up gradually with height climbed (0 = easiest, 1 = hardest)
+// Progressive height scoring: each meter is worth more the higher you are —
+// at 10,000px climbed a meter counts ~1.5x, rewarding deep runs
+function heightPointsFromPx(px) {
+  return Math.floor((px / 10) * (1 + px / 20000));
+}
+let scorePenalty = 0; // accumulated race fall penalties (keeps the height floor honest)
+
+function difficultyAt(heightClimbed) {
+  return clamp01(heightClimbed / 4500);
+}
+
+// A gentle second difficulty slope that keeps the very high altitudes
+// challenging after the main ramp caps out at 4500
+function lateDifficultyAt(heightClimbed) {
+  return clamp01((heightClimbed - 4500) / 6000);
+}
+
+function roundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function drawCandy(ctx, cx, cy, r, color, twist) {
+  // wrapped candy: rounded body + two twisted wrapper ends
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(twist || 0);
+
+  // wrapper ends (triangular twists)
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(-r * 1.9, 0);
+  ctx.lineTo(-r * 1.15, -r * 0.55);
+  ctx.lineTo(-r * 1.15, r * 0.55);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(r * 1.9, 0);
+  ctx.lineTo(r * 1.15, -r * 0.55);
+  ctx.lineTo(r * 1.15, r * 0.55);
+  ctx.closePath();
+  ctx.fill();
+
+  // body
+  roundRectPath(ctx, -r * 1.15, -r * 0.85, r * 2.3, r * 1.7, r * 0.75);
+  ctx.fill();
+
+  // diagonal candy stripes
+  ctx.save();
+  roundRectPath(ctx, -r * 1.15, -r * 0.85, r * 2.3, r * 1.7, r * 0.75);
+  ctx.clip();
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+  ctx.lineWidth = r * 0.35;
+  for (let sx = -r * 2; sx < r * 2; sx += r * 0.8) {
+    ctx.beginPath();
+    ctx.moveTo(sx, -r);
+    ctx.lineTo(sx + r, r);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // shine
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.beginPath();
+  ctx.ellipse(-r * 0.35, -r * 0.35, r * 0.4, r * 0.18, -0.5, 0, Math.PI*2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function initClouds() {
+  clouds = [];
+  for (let i = 0; i < 6; i++) {
+    clouds.push({ x: randRange(0, W), y: randRange(0, H), w: randRange(50, 100), speed: randRange(0.15, 0.4) });
+  }
+}
+
+function initHills() {
+  hills = [];
+  for (let i = 0; i < 20; i++) {
+    hills.push({ y: i * 400, offset: randRange(0, W) });
+  }
+}
+
+function initPlatforms() {
+  platforms = [];
+  flags = [];
+  candies = [];
+  gifts = [];
+  platforms.push({ x: W/2 - PLATFORM_W/2, y: H - 50, w: PLATFORM_W, moving:false, dir:1, speed:0 });
+  let y = H - 130;
+  const startY = H - 130;
+  while (y > -H) {
+    const climbedSoFar = startY - y;
+    spawnPlatform(y, difficultyAt(climbedSoFar), climbedSoFar);
+    y -= randRange(58, 98);
+  }
+}
+
+function flagIndexForHeight(h) {
+  return Math.min(FLAG_NATIONS.length - 1, Math.floor(Math.max(0, h) / HEIGHT_PER_FLAG));
+}
+
+// Flags spawn as a UNIFORM random pick among all nations unlocked so far (up to the
+// current tier), so no single flag dominates a run. Climbing higher unlocks more
+// prestigious nations into the pool; at the top, all 16 appear equally.
+// The nation unlock ORDER is shuffled every game, so each run starts
+// with a different pair of countries instead of always Canada & USA
+let flagOrder = FLAG_NATIONS.map(function(_, i) { return i; });
+function shuffleFlagOrder() {
+  flagOrder = FLAG_NATIONS.map(function(_, i) { return i; });
+  for (let i = flagOrder.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = flagOrder[i]; flagOrder[i] = flagOrder[j]; flagOrder[j] = t;
+  }
+}
+
+function randomUnlockedFlagIndex(h) {
+  return flagOrder[Math.floor(Math.random() * (flagIndexForHeight(h) + 1))];
+}
+
+function spawnPlatform(y, diff, climbed) {
+  diff = diff || 0;
+  climbed = climbed || 0;
+  const w = Math.max(38, PLATFORM_W - diff * 24);
+  const x = randRange(10, W - w - 10);
+  const movingChance = 0.2 + diff * 0.35 + lateDifficultyAt(climbed) * 0.15;
+  const moving = Math.random() < movingChance && y < H - 200;
+  platforms.push({
+    x, y, w,
+    moving,
+    dir: Math.random() < 0.5 ? 1 : -1,
+    speed: randRange(1 + diff * 1.2, 2 + diff * 2.2) + lateDifficultyAt(climbed) * 1.0
+  });
+  const roll = Math.random();
+  if (roll < 0.50) {
+    flags.push({
+      x: x + w/2, y: y - 32, collected: false, bob: Math.random()*Math.PI*2,
+      countryIdx: randomUnlockedFlagIndex(climbed)
+    });
+  } else if (roll < 0.72) {
+    candies.push({
+      x: x + w/2, y: y - 32, collected: false, bob: Math.random()*Math.PI*2,
+      color: CANDY_COLORS[Math.floor(Math.random()*CANDY_COLORS.length)],
+      twist: randRange(-0.3, 0.3)
+    });
+  } else if (roll < 0.80) {
+    gifts.push({ x: x + w/2, y: y - 32, collected: false, bob: Math.random()*Math.PI*2 });
+  }
+}
+
+function resetGame() {
+  ball.x = W/2; ball.y = H - 100; ball.vx = 0; ball.vy = BOUNCE_VELOCITY; ball.facing = 1;
+  cameraY = 0;
+  score = 0;
+  wasMoving = false;
+  deathReason = 'fall';
+  celebratedNewBest = false;
+  bestAtRunStart = best;
+  celebratedChampion = false;
+  trophyTimer = 0;
+  paused = false;
+  raceOver = false;
+  scorePenalty = 0;
+  playerFalls = 0;
+  playerEliminated = false;
+  botScrollDebt = 0;
+  shuffleFlagOrder();
+  goalPendingCount = 0;
+  goalGame = { active: false };
+  boostsQueued = 0;
+  raceCountdown = gameMode === 'race' ? 230 : 0; // goal message, then 3…2…1…GO!
+  document.getElementById('raceGoal').style.display = gameMode === 'race' ? 'block' : 'none';
+  document.getElementById('raceGoal').textContent = '🎯 FIRST TO ' + raceTarget;
+  prevLeaderName = '';
+  leadChangeCooldown = 0;
+  finalStretchShown = false;
+  document.getElementById('countdown').classList.remove('pop');
+  pauseOverlayEl.classList.remove('show');
+  matchStartTime = Date.now();
+  lives = 3;
+  flagsCollectedCount = 0;
+  flagCountsByCountry = {};
+  reviveGraceTimer = 0;
+  renderLives();
+  renderFlagCounter();
+  matchClockEl.textContent = '0:00';
+  stormY = H + 260;
+  stormWarned = false;
+  stormWarning.classList.remove('show');
+  shieldActive = false;
+  shieldTimer = 0;
+  shieldTag.classList.remove('show');
+  scoreEl.textContent = score;
+  bestEl.textContent = best;
+  particles = [];
+  confetti = [];
+  ballTrail = [];
+  boostTimer = 0;
+  flashTimer = 0;
+  recentPickupTimes = [];
+  scoreMultiplier = 1;
+  multiplierTimer = 0;
+  multTagEl.classList.remove('show');
+  rewardBannerEl.classList.remove('show');
+  popups = [];
+  initPlatforms();
+  initClouds();
+  initHills();
+  initCrowd();
+  initBirds();
+  initBots();
+  document.getElementById('raceBoard').innerHTML = '';
+  raceBoardT = 0;
+  initSkyStars();
+  running = true;
+}
+
+function addPopup(text, x, y, color) {
+  popups.push({ text, x, y, life: 45, color: color || '#ffcc33' });
+}
+
+function addSparkle(x, y) {
+  for (let i = 0; i < 10; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const speed = randRange(1.5, 4);
+    particles.push({
+      x, y,
+      vx: Math.cos(a) * speed,
+      vy: Math.sin(a) * speed,
+      life: 28,
+      color: Math.random() < 0.5 ? '#ffe066' : '#ffffff'
+    });
+  }
+}
+
+function addConfetti(x, y, count) {
+  for (let i = 0; i < (count || 26); i++) {
+    const a = Math.random() * Math.PI * 2;
+    const speed = randRange(2, 7);
+    confetti.push({
+      x, y,
+      vx: Math.cos(a) * speed,
+      vy: Math.sin(a) * speed - 2,
+      rot: Math.random() * Math.PI * 2,
+      vrot: randRange(-0.35, 0.35),
+      w: randRange(4, 7),
+      h: randRange(6, 10),
+      life: 70,
+      maxLife: 70,
+      color: WC_COLORS[Math.floor(Math.random() * WC_COLORS.length)]
+    });
+  }
+}
+
+// ============ GOLDEN GOAL: sky-stadium penalty kick bonus stage ============
+function startGoalGame() {
+  goalGame = {
+    active: true, phase: 'aim', t: 0,
+    aimX: 0, keeperX: 0, kickAim: 0, shotT: 0,
+    result: '', resT: 0, netRipple: 0
+  };
+  goalPausedAt = Date.now();
+  keys.left = false; keys.right = false;
+  playWhistle(true);
+  playCrowdRoar(0.9, 0.07);
+}
+
+function kickGoalBall() {
+  if (!goalGame.active || goalGame.phase !== 'aim') return;
+  goalGame.kickAim = goalGame.aimX;
+  goalGame.keeperAtKick = goalGame.keeperX;
+  goalGame.phase = 'shot';
+  goalGame.shotT = 0;
+  beep({ freq: 130, duration: 0.12, type: 'triangle', volume: 0.2 }); // kick thump
+}
+
+function finishGoalGame() {
+  goalGame.active = false;
+  matchStartTime += Date.now() - goalPausedAt; // bonus stage doesn't eat the clock
+  if (goalGame.result === 'goal') {
+    boostsQueued = 2;             // two more launches queued...
+    boostTimer = 120;             // ...and the first fires right now
+    ball.vy = -24;
+    reviveGraceTimer = Math.max(reviveGraceTimer, 150);
+    addConfetti(ball.x, ball.y, 50);
+    showReward('🚀 TRIPLE MEGA BOOST!', '#ffd54f', '255,213,79', '⚽', 'golden goal reward');
+    playAirHorn(true);
+  }
+}
+
+function updateGoalGame() {
+  const g = goalGame;
+  g.t++;
+  if (g.phase === 'aim') {
+    g.aimX = Math.sin(g.t * 0.052);                 // sweeping aim
+    g.keeperX = Math.sin(g.t * 0.033 + 1.7) * 0.55; // patrolling keeper
+    if (g.t > 420) kickGoalBall();                  // hesitate too long and it auto-fires
+  } else if (g.phase === 'shot') {
+    g.shotT++;
+    // the keeper DIVES toward the shot — beat his reach from where he stood
+    const willSave = Math.abs(g.kickAim - g.keeperAtKick) < 0.34 && Math.abs(g.kickAim) <= 0.94;
+    const diveTarget = willSave ? g.kickAim : g.keeperAtKick + (g.kickAim - g.keeperAtKick) * 0.35;
+    g.keeperX = g.keeperAtKick + (diveTarget - g.keeperAtKick) * Math.min(1, g.shotT / 26);
+    if (g.shotT >= 30) {
+      if (Math.abs(g.kickAim) > 0.94) {
+        g.result = 'post';
+        beep({ freq: 900, duration: 0.09, type: 'square', volume: 0.18 }); // clank
+      } else if (willSave) {
+        g.result = 'save';
+        playCrowdRoar(0.7, 0.05);
+      } else {
+        g.result = 'goal';
+        g.netRipple = 14;
+        playCrowdRoar(1.6, 0.14);
+        playChampionFanfare();
+      }
+      g.phase = 'result';
+      g.resT = 0;
+    }
+  } else if (g.phase === 'result') {
+    g.resT++;
+    if (g.netRipple > 0) g.netRipple--;
+    if (g.resT >= 95) finishGoalGame();
+  }
+}
+
+function drawGoalGame() {
+  const g = goalGame;
+  const cx = W / 2;
+  const goalY = 150, goalHalf = 105, mouthY = goalY + 58;
+
+  // night-match dim + stadium spotlight
+  ctx.save();
+  ctx.fillStyle = 'rgba(6,10,26,0.6)';
+  ctx.fillRect(0, 0, W, H);
+  const spot = ctx.createRadialGradient(cx, goalY + 30, 20, cx, goalY + 30, 320);
+  spot.addColorStop(0, 'rgba(255,250,220,0.20)');
+  spot.addColorStop(1, 'rgba(255,250,220,0)');
+  ctx.fillStyle = spot;
+  ctx.fillRect(0, 0, W, H);
+
+  // crowd: two arcs of flickering dots
+  for (let row = 0; row < 2; row++) {
+    for (let i = 0; i < 26; i++) {
+      const a = Math.PI * (0.15 + 0.7 * i / 25);
+      const rr = 175 + row * 22;
+      const x = cx + Math.cos(a) * rr;
+      const y = goalY + 40 - Math.sin(a) * (rr * 0.55);
+      if (y < 6) continue;
+      ctx.fillStyle = 'rgba(255,235,180,' + (0.25 + 0.35 * Math.abs(Math.sin(g.t * 0.1 + i * 1.7 + row))) + ')';
+      ctx.fillRect(x, y, 2.5, 2.5);
+    }
+  }
+
+  // cloud the goal floats on
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  for (const [ox, or_] of [[-60, 26], [0, 34], [60, 26], [-30, 30], [30, 30]]) {
+    ctx.beginPath();
+    ctx.arc(cx + ox, goalY + 78, or_, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // goal frame + net (net ripples on a goal)
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx - goalHalf, goalY + 62);
+  ctx.lineTo(cx - goalHalf, goalY);
+  ctx.lineTo(cx + goalHalf, goalY);
+  ctx.lineTo(cx + goalHalf, goalY + 62);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+  const rip = g.netRipple > 0 ? Math.sin(g.t * 0.9) * g.netRipple * 0.4 : 0;
+  for (let i = 1; i < 8; i++) {
+    const nx = cx - goalHalf + (goalHalf * 2 / 8) * i;
+    ctx.beginPath();
+    ctx.moveTo(nx, goalY + 2);
+    ctx.quadraticCurveTo(nx + rip, goalY + 30, nx, goalY + 60);
+    ctx.stroke();
+  }
+  for (let j = 1; j < 5; j++) {
+    const ny = goalY + (62 / 5) * j;
+    ctx.beginPath();
+    ctx.moveTo(cx - goalHalf + 3, ny);
+    ctx.quadraticCurveTo(cx, ny + rip, cx + goalHalf - 3, ny);
+    ctx.stroke();
+  }
+
+  // keeper: jersey, head, gloves — dives toward the ball on a save
+  let kx = cx + g.keeperX * (goalHalf - 22);
+  let kLean = 0;
+  if (g.phase === 'result' && g.result === 'save') {
+    kx = cx + g.kickAim * (goalHalf - 22);
+    kLean = g.kickAim * 0.5;
+  }
+  ctx.save();
+  ctx.translate(kx, goalY + 42);
+  ctx.rotate(kLean);
+  ctx.fillStyle = '#ff8c42';
+  roundRectPath(ctx, -9, -10, 18, 24, 5);
+  ctx.fill();
+  ctx.fillStyle = '#ffd9b0';
+  ctx.beginPath(); ctx.arc(0, -16, 7, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#eeeeee';
+  ctx.beginPath(); ctx.arc(-13, -4, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(13, -4, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+
+  // the ball: waiting at the spot, or flying its arc to the target
+  let bx = cx, by = H - 130, br = 14;
+  if (g.phase === 'aim') {
+    by += Math.sin(g.t * 0.15) * 3; // eager little hop
+  } else {
+    const p = Math.min(1, g.shotT / 30);
+    const tx = cx + g.kickAim * (goalHalf - 12);
+    bx = cx + (tx - cx) * p;
+    by = (H - 130) + (mouthY - (H - 130)) * p - Math.sin(p * Math.PI) * 60;
+    br = 14 - 6 * p; // shrinks with distance
+    if (g.phase === 'result' && g.result === 'post') {
+      bx = tx + (g.resT * 2.5) * (g.kickAim > 0 ? 1 : -1); // ricochet away
+      by = mouthY + g.resT * 3;
+      br = 8;
+    }
+    if (g.phase === 'result' && g.result === 'save') { bx = cx + g.kickAim * (goalHalf - 22); by = goalY + 46; br = 8; }
+    if (g.phase === 'result' && g.result === 'goal') { bx = cx + g.kickAim * (goalHalf - 12); by = mouthY - 4; br = 8; }
+  }
+  ctx.save();
+  ctx.translate(bx, by);
+  drawTriondaCharacter(br, 1, g.t * 0.12);
+  ctx.restore();
+
+  // aim indicator: dashed sight-line + target ring
+  if (g.phase === 'aim') {
+    const tx = cx + g.aimX * (goalHalf - 12);
+    ctx.save();
+    ctx.setLineDash([5, 7]);
+    ctx.strokeStyle = 'rgba(255,224,102,0.75)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(bx, by - 16);
+    ctx.quadraticCurveTo((bx + tx) / 2, (by + mouthY) / 2 - 70, tx, mouthY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = '#ffe066';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(tx, mouthY, 9 + Math.sin(g.t * 0.2) * 1.5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // headline + prompt / verdict
+  ctx.textAlign = 'center';
+  ctx.font = '800 13px sans-serif';
+  ctx.fillStyle = '#ffd54f';
+  ctx.fillText('🥅 GOLDEN GOAL', cx, 92);
+  ctx.font = '700 10px sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillText('beat the keeper — win 3 MEGA BOOSTS', cx, 108);
+  if (g.phase === 'aim') {
+    ctx.font = '800 17px sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,' + (0.55 + 0.45 * Math.abs(Math.sin(g.t * 0.09))) + ')';
+    ctx.fillText('TAP TO SHOOT!', cx, H - 70);
+  }
+  if (g.phase === 'result') {
+    const popIn = Math.min(1, g.resT / 8);
+    ctx.save();
+    ctx.translate(cx, H * 0.45);
+    ctx.scale(0.6 + popIn * 0.4, 0.6 + popIn * 0.4);
+    ctx.font = '900 40px sans-serif';
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    const msg = g.result === 'goal' ? '⚽ GOOOOAL!' : g.result === 'save' ? '🧤 SAVED!' : 'OFF THE POST!';
+    ctx.strokeText(msg, 0, 0);
+    ctx.fillStyle = g.result === 'goal' ? '#ffd54f' : '#cfd8e3';
+    ctx.fillText(msg, 0, 0);
+    ctx.restore();
+    if (g.result === 'goal' && g.resT === 2) addConfetti(cx, goalY + 40, 60);
+  }
+  ctx.restore();
+}
+
+function update() {
+  // GOLDEN GOAL bonus stage: the world holds its breath
+  if (goalGame.active) { updateGoalGame(); return; }
+
+  // Pre-race countdown: everything holds while 3…2…1…GO! plays
+  if (raceCountdown > 0) {
+    raceCountdown--;
+    matchStartTime = Date.now(); // clock starts at GO
+    const el = document.getElementById('countdown');
+    const inGoalPhase = raceCountdown > 165;
+    let label;
+    if (inGoalPhase) {
+      label = '🎯 FIRST TO ' + raceTarget;
+    } else {
+      const step = Math.ceil(raceCountdown / 55); // 3, 2, 1, then 0 = GO
+      label = step >= 1 ? String(step) : 'GO!';
+    }
+    if (el.textContent !== label) {
+      el.textContent = label;
+      el.classList.toggle('goalMsg', inGoalPhase);
+      el.classList.remove('pop');
+      void el.offsetWidth;
+      el.classList.add('pop');
+      if (inGoalPhase) playWhistle(false);
+      else if (label !== 'GO!') beep({ freq: 440, duration: 0.12, type: 'square', volume: 0.14 });
+      else { beep({ freq: 880, duration: 0.4, type: 'square', volume: 0.16 }); playCrowdRoar(0.8, 0.08); }
+    }
+    if (raceCountdown <= 0) {
+      setTimeout(function() { el.classList.remove('pop'); }, 900);
+    }
+    return;
+  }
+
+  const isMoving = keys.left || keys.right;
+  if (isMoving && !wasMoving) playMoveSound(keys.left ? 'left' : 'right');
+  wasMoving = isMoving;
+
+  if (keys.left) { ball.vx = -MOVE_SPEED; ball.facing = -1; }
+  else if (keys.right) { ball.vx = MOVE_SPEED; ball.facing = 1; }
+  else ball.vx *= 0.85;
+
+  ball.x += ball.vx;
+  if (ball.x < ball.r) ball.x = ball.r;
+  if (ball.x > W - ball.r) ball.x = W - ball.r;
+
+  if (boostTimer <= 0 && boostsQueued > 0) {
+    boostsQueued--;
+    boostTimer = 120;
+    ball.vy = -24;
+    reviveGraceTimer = Math.max(reviveGraceTimer, 150);
+    addConfetti(ball.x, ball.y, 25);
+    addPopup('MEGA BOOST! (' + (2 - boostsQueued + 1) + '/3)', ball.x, ball.y - 40, '#ffd54f');
+    playAirHorn(true);
+  }
+  if (boostTimer > 0) {
+    boostTimer--;
+    ball.vy = Math.min(ball.vy, -14); // sustained rocket flight
+    if (boostTimer % 3 === 0) addSparkle(ball.x, ball.y + ball.r);
+  } else {
+    ball.vy += GRAVITY;
+  }
+  ball.y += ball.vy;
+
+  // motion trail: keep the last few positions
+  ballTrail.push({ x: ball.x, y: ball.y });
+  if (ballTrail.length > 8) ballTrail.shift();
+
+  for (const p of platforms) {
+    if (p.moving) {
+      p.x += p.dir * p.speed;
+      if (p.x < 5 || p.x + p.w > W - 5) p.dir *= -1;
+    }
+  }
+
+  recentScroll *= 0.95;
+  updateRaceLeader();
+  updateBots();
+
+  // Storm creeps upward on its own; climbing fast pushes it back down (via the camera-shift below).
+  // Stalling lets it catch up — adds real time pressure on top of "don't fall".
+  const stormDiff = difficultyAt(cameraY);
+  const stormSpeed = 0.35 + stormDiff * 1.5 + lateDifficultyAt(cameraY) * 0.7;
+  stormY -= stormSpeed;
+
+  const stormGap = stormY - ball.y;
+  if (stormGap < 220 && stormGap > -40) {
+    if (!stormWarned) { stormWarned = true; stormWarning.classList.add('show'); playStormAlertSound(); }
+  } else if (stormGap >= 220 && stormWarned) {
+    stormWarned = false;
+    stormWarning.classList.remove('show');
+  }
+
+  if (ball.vy > 0) {
+    for (const p of platforms) {
+      if (
+        ball.x + ball.r*0.6 > p.x &&
+        ball.x - ball.r*0.6 < p.x + p.w &&
+        ball.y + ball.r > p.y &&
+        ball.y + ball.r < p.y + PLATFORM_H + 10
+      ) {
+        ball.vy = BOUNCE_VELOCITY;
+        p.dip = 5; // squash animation on impact
+        addSparkle(ball.x, ball.y + ball.r);
+        playJumpSound();
+      }
+    }
+  }
+  for (const p of platforms) {
+    if (p.dip) p.dip *= 0.82;
+  }
+
+  for (const f of flags) {
+    if (f.collected) continue;
+    f.bob += 0.08;
+    const dx = ball.x - f.x, dy = ball.y - (f.y + Math.sin(f.bob)*4);
+    if (Math.sqrt(dx*dx + dy*dy) < ball.r + FLAG_R) {
+      f.collected = true;
+      const flagPts = 10 * scoreMultiplier;
+      score += flagPts;
+      flagsCollectedCount++;
+      renderFlagCounter();
+      flagCountsByCountry[f.countryIdx] = (flagCountsByCountry[f.countryIdx] || 0) + 1;
+      addSparkle(f.x, f.y);
+      addPopup('+' + flagPts, f.x, f.y, '#ffe066');
+      playStarSound();
+      registerPickup();
+      // Collecting 3 flags of the same country earns an extra life
+      if (flagCountsByCountry[f.countryIdx] % 3 === 0 && lives < MAX_LIVES) {
+        lives++;
+        renderLives();
+        const nation = FLAG_NATIONS[f.countryIdx] || FLAG_NATIONS[0];
+        addConfetti(f.x, f.y, 20);
+        addPopup('+1 LIFE! (3x ' + nation.name + ')', f.x, f.y - 22, '#69f0ae');
+        showReward('+1 LIFE!', '#69f0ae', '105,240,174',
+          nation.emoji, nation.emoji + ' × ' + flagCountsByCountry[f.countryIdx]);
+        playAirHorn(false);
+      }
+      // Collecting 5 flags of the same country launches a MEGA BOOST
+      if (flagCountsByCountry[f.countryIdx] % 5 === 0 && flagCountsByCountry[f.countryIdx] % 7 !== 0) {
+        const nation = FLAG_NATIONS[f.countryIdx] || FLAG_NATIONS[0];
+        triggerMegaBoost(nation, flagCountsByCountry[f.countryIdx]);
+      }
+      // Collecting 7 flags of the same country earns a GOLDEN GOAL penalty kick!
+      if (flagCountsByCountry[f.countryIdx] % 7 === 0) {
+        const nation = FLAG_NATIONS[f.countryIdx] || FLAG_NATIONS[0];
+        goalPendingCount++;
+        addConfetti(f.x, f.y, 25);
+        showReward('🥅 GOLDEN GOAL EARNED!', '#ffd54f', '255,213,79',
+          nation.emoji, nation.emoji + ' × ' + flagCountsByCountry[f.countryIdx]);
+        playWhistle(true);
+      }
+    }
+  }
+
+  for (const c of candies) {
+    if (c.collected) continue;
+    c.bob += 0.08;
+    const dx = ball.x - c.x, dy = ball.y - (c.y + Math.sin(c.bob)*4);
+    if (Math.sqrt(dx*dx + dy*dy) < ball.r + CANDY_R) {
+      c.collected = true;
+      const candyPts = 15 * scoreMultiplier;
+      score += candyPts;
+      addSparkle(c.x, c.y);
+      addConfetti(c.x, c.y, 10);
+      addPopup('+' + candyPts, c.x, c.y, c.color);
+      playCandySound();
+      registerPickup();
+    }
+  }
+
+  for (const g of gifts) {
+    if (g.collected) continue;
+    g.bob += 0.08;
+    const dx = ball.x - g.x, dy = ball.y - (g.y + Math.sin(g.bob)*4);
+    if (Math.sqrt(dx*dx + dy*dy) < ball.r + GIFT_R) {
+      g.collected = true;
+      shieldActive = true;
+      shieldTimer = SHIELD_DURATION;
+      addSparkle(g.x, g.y);
+      addConfetti(g.x, g.y, 16);
+      addPopup('SHIELD!', g.x, g.y, '#40c4ff');
+      playGiftSound();
+      registerPickup();
+    }
+  }
+
+  if (shieldActive) {
+    shieldTimer--;
+    shieldTag.classList.add('show');
+    if (shieldTimer <= 0) {
+      shieldActive = false;
+      shieldTag.classList.remove('show');
+      playShieldExpireSound();
+    }
+  } else {
+    shieldTag.classList.remove('show');
+  }
+
+  if (trophyTimer > 0) trophyTimer--;
+
+  // GOLDEN GOAL trigger: earned via 10 same flags, fired when safe (not mid-rocket)
+  if (running && !paused && !playerEliminated && goalPendingCount > 0 && boostTimer <= 0 && reviveGraceTimer <= 0) {
+    goalPendingCount--;
+    startGoalGame();
+    return;
+  }
+
+  // RACE mode: first to reach the target wins — or be the last one standing
+  if (gameMode === 'race' && !raceOver) {
+    const playerScore = score;
+    // final stretch: someone is closing on the finish line
+    if (!finalStretchShown) {
+      const bestBot = bots.reduce(function(m, b) { return b.eliminated ? m : Math.max(m, b.bestClimb + b.flagPoints); }, 0);
+      if (Math.max(playerScore, bestBot) >= raceTarget - 150) {
+        finalStretchShown = true;
+        showReward('🏁 FINAL STRETCH!', '#ffd54f', '255,213,79', '🏁', 'first to ' + raceTarget + ' wins');
+        playCrowdRoar(1.2, 0.1);
+      }
+    }
+    if (playerScore >= raceTarget) {
+      raceOver = true;
+      running = false;
+      showRaceResult(true, 'YOU', 'You reached ' + raceTarget + ' first!');
+      return;
+    }
+    const winnerBot = bots.find(function(b) { return Math.max(0, b.bestClimb + b.flagPoints) >= raceTarget; });
+    if (winnerBot) {
+      raceOver = true;
+      running = false;
+      showRaceResult(false, winnerBot.name, winnerBot.name + ' reached ' + raceTarget + ' first');
+      return;
+    }
+  }
+  if (flashTimer > 0) flashTimer--;
+  if (multiplierTimer > 0) {
+    multiplierTimer--;
+    if (multiplierTimer <= 0) {
+      scoreMultiplier = 1;
+      multTagEl.classList.remove('show');
+      playShieldExpireSound();
+    }
+  }
+
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const pt = particles[i];
+    pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.1; pt.life--;
+    if (pt.life <= 0) particles.splice(i, 1);
+  }
+  for (let i = confetti.length - 1; i >= 0; i--) {
+    const cf = confetti[i];
+    cf.x += cf.vx; cf.y += cf.vy; cf.vy += 0.15; cf.rot += cf.vrot; cf.life--;
+    if (cf.life <= 0) confetti.splice(i, 1);
+  }
+  for (let i = popups.length - 1; i >= 0; i--) {
+    popups[i].y -= 0.6; popups[i].life--;
+    if (popups[i].life <= 0) popups.splice(i, 1);
+  }
+
+  if (ball.y < H/2) {
+    const dy = H/2 - ball.y;
+    ball.y = H/2;
+    cameraY += dy;
+    stormY += dy;
+    for (const p of platforms) p.y += dy;
+    for (const f of flags) f.y += dy;
+    for (const c of candies) c.y += dy;
+    for (const g of gifts) g.y += dy;
+    for (const pt of particles) pt.y += dy;
+    for (const cf of confetti) cf.y += dy;
+    for (const bt of ballTrail) bt.y += dy;
+    for (const b of bots) {
+      if (b.ahead) {
+        // the camera catching up eats into the bot's off-screen lead
+        b.virtualLead -= dy;
+        if (b.virtualLead <= 0) {
+          b.ahead = false;
+          b.virtualLead = 0;
+          b.y = -13;
+          b.vy = 2.5; // descend into view — prevents boundary flicker
+          b.reactT = 0;
+          b.targetPlatform = null;
+        }
+      } else {
+        b.y += dy;
+      }
+    }
+    recentScroll += dy;
+    if (boostTimer > 0 && gameMode === 'race') botScrollDebt += dy;
+    for (const pu of popups) pu.y += dy;
+    if (!celebratedNewBest && score > bestAtRunStart && bestAtRunStart > 0) {
+      celebratedNewBest = true;
+      addConfetti(ball.x, ball.y - 20, 40);
+      addPopup('GOAL! NEW BEST', ball.x, ball.y - 40, '#ffe066');
+      playGoalFanfare();
+    }
+    if (!celebratedChampion && Math.floor(cameraY / HEIGHT_PER_FLAG) >= FLAG_NATIONS.length - 1) {
+      celebratedChampion = true;
+      trophyTimer = 300; // ~5 seconds
+      addConfetti(ball.x, ball.y - 20, 70);
+      addPopup('WORLD CHAMPIONS!', ball.x, ball.y - 50, '#FEDD00');
+      playChampionFanfare();
+    }
+
+    const diff = difficultyAt(cameraY);
+    // Max jump height is ~197px (v²/2g with BOUNCE_VELOCITY and GRAVITY), so every
+    // vertical gap must stay comfortably below that. Instead of dumping recycled
+    // platforms into a fixed band (which clumps them and can leave unjumpable voids),
+    // chain each one a bounded distance above the current highest platform.
+    const MAX_SAFE_GAP = 140;
+    for (const p of platforms) {
+      if (p.y > H) {
+        let topY = Infinity;
+        for (const q of platforms) {
+          if (q !== p && q.y < topY) topY = q.y;
+        }
+        const gap = randRange(58, Math.min(MAX_SAFE_GAP, 98 + diff * 40));
+        p.y = (topY === Infinity) ? -gap : topY - gap;
+        p.w = Math.max(38, PLATFORM_W - diff * 24);
+        p.x = randRange(10, W - p.w - 10);
+        p.moving = Math.random() < (0.2 + diff * 0.35 + lateDifficultyAt(cameraY) * 0.15);
+        p.dir = Math.random() < 0.5 ? 1 : -1;
+        p.speed = randRange(1 + diff * 1.2, 2 + diff * 2.2) + lateDifficultyAt(cameraY) * 1.0;
+      }
+    }
+    for (const f of flags) {
+      if (f.y > H) {
+        // Always attach to a platform that's still ahead (above the view), never one behind the player
+        const ahead = platforms.filter(p => p.y < 0);
+        const near = ahead.length
+          ? ahead[Math.floor(Math.random() * ahead.length)]
+          : platforms.reduce((a,b) => a.y < b.y ? a : b);
+        f.x = near.x + near.w/2;
+        f.y = near.y - 32;
+        f.collected = Math.random() < 0.12;
+        f.takenBy = {};
+        f.countryIdx = randomUnlockedFlagIndex(cameraY);
+      }
+    }
+    for (const c of candies) {
+      if (c.y > H) {
+        const ahead = platforms.filter(p => p.y < 0);
+        const near = ahead.length
+          ? ahead[Math.floor(Math.random() * ahead.length)]
+          : platforms.reduce((a,b) => a.y < b.y ? a : b);
+        c.x = near.x + near.w/2;
+        c.y = near.y - 32;
+        c.collected = Math.random() < 0.5;
+        c.color = CANDY_COLORS[Math.floor(Math.random()*CANDY_COLORS.length)];
+      }
+    }
+    for (const g of gifts) {
+      if (g.y > H) {
+        const ahead = platforms.filter(p => p.y < 0);
+        const near = ahead.length
+          ? ahead[Math.floor(Math.random() * ahead.length)]
+          : platforms.reduce((a,b) => a.y < b.y ? a : b);
+        g.x = near.x + near.w/2;
+        g.y = near.y - 32;
+        g.collected = Math.random() < 0.85; // gifts stay rare
+      }
+    }
+  }
+
+  const barrierY = H - BARRIER_OFFSET;
+  if (shieldActive && ball.vy > 0 && ball.y + ball.r >= barrierY) {
+    ball.y = barrierY - ball.r;
+    ball.vy = BOUNCE_VELOCITY * 0.85;
+    addSparkle(ball.x, barrierY);
+    playJumpSound();
+  }
+
+  if (reviveGraceTimer > 0) reviveGraceTimer--;
+
+  // spectator mode: the eliminated player's ball sits parked off-stage
+  if (playerEliminated) {
+    ball.x = -999; ball.y = H * 0.92; ball.vy = 0; ball.vx = 0;
+  }
+
+  // height-based score floor, evaluated every frame (same baseline as the bots)
+  if (!playerEliminated) {
+    const inScreenClimb = Math.max(0, (H - 100) - ball.y);
+    score = Math.max(score, heightPointsFromPx(cameraY + inScreenClimb) - scorePenalty);
+  }
+  scoreEl.textContent = score;
+  if (score > best) { best = score; bestEl.textContent = best; }
+
+  if (ball.y - ball.r > H + 40) {
+    handleDeath('fall');
+  } else if (reviveGraceTimer <= 0 && ball.y + ball.r > stormY) {
+    handleDeath('storm');
+  }
+}
+
+let playerFalls = 0;
+let playerEliminated = false; // legacy flag, always false under endless-lives race rules
+const RACE_FALL_PENALTY = 60;
+
+function handleDeath(reason) {
+  if (gameMode === 'race') {
+    // race rules: endless lives — falling or the storm costs POINTS instead
+    playerFalls++;
+    scorePenalty += RACE_FALL_PENALTY;
+    score = Math.max(0, score - RACE_FALL_PENALTY);
+    addPopup('-' + RACE_FALL_PENALTY + ' pts', ball.x, ball.y - 30, '#ff6b6b');
+    revivePlayer();
+    return;
+  }
+  playerFalls++;
+  lives--;
+  renderLives();
+  if (lives > 0) {
+    revivePlayer();
+  } else {
+    deathReason = reason;
+    running = false;
+    showGameOver();
+  }
+}
+
+function triggerMegaBoost(nation, count) {
+  boostTimer = 120; // ~2s of super-flight
+  reviveGraceTimer = Math.max(reviveGraceTimer, 150); // immune to the storm during and just after
+  ball.vy = -24; // rocket launch
+  addConfetti(ball.x, ball.y, 40);
+  addPopup('MEGA BOOST! (5x ' + nation.name + ')', ball.x, ball.y - 40, '#ffd54f');
+  showReward('🚀 MEGA BOOST!', '#ffd54f', '255,213,79',
+    nation.emoji, nation.emoji + ' × ' + count);
+  playAirHorn(true);
+  playCrowdRoar(1.5, 0.12);
+}
+
+function revivePlayer() {
+  // Respawn on the platform nearest mid-screen, with a short grace period
+  playWhistle(false);
+  const visible = platforms.filter(p => p.y > 60 && p.y < H - 60);
+  const target = visible.length
+    ? visible.reduce((a,b) => Math.abs(a.y - H*0.45) < Math.abs(b.y - H*0.45) ? a : b)
+    : platforms.reduce((a,b) => a.y > b.y ? a : b);
+  ball.x = target.x + target.w / 2;
+  ball.y = target.y - ball.r - 2;
+  ball.vx = 0;
+  ball.vy = BOUNCE_VELOCITY;
+  stormY = Math.max(stormY, H + 200); // push the storm back down
+  stormWarned = false;
+  stormWarning.classList.remove('show');
+  reviveGraceTimer = 90; // ~1.5s of storm immunity
+  ballTrail = [];
+  addConfetti(ball.x, ball.y, 12);
+  addPopup('BACK IN THE GAME!', ball.x, ball.y - 30, '#ffe066');
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+function lerpColor(c1, c2, t) {
+  return 'rgb(' +
+    Math.round(lerp(c1[0], c2[0], t)) + ',' +
+    Math.round(lerp(c1[1], c2[1], t)) + ',' +
+    Math.round(lerp(c1[2], c2[2], t)) + ')';
+}
+
+const SKY_DAY   = { top: [79,172,254], mid: [127,216,247], bot: [222,247,236] };
+const SKY_NIGHT = { top: [12,14,42],   mid: [45,35,95],    bot: [255,158,140] };
+
+// The sky journeys through four distinct phases as you climb: bright day,
+// golden sunset, starry night, and finally the deep purple edge of space.
+const SKY_PHASES = [
+  { top: [79,172,254],  mid: [127,216,247], bot: [222,247,236] }, // day
+  { top: [86,90,180],   mid: [244,140,110], bot: [255,200,120] }, // sunset
+  { top: [12,14,42],    mid: [45,35,95],    bot: [255,158,140] }, // night
+  { top: [3,2,14],      mid: [28,10,58],    bot: [70,30,110]  }   // deep space
+];
+const SKY_PHASE_HEIGHT = 1300; // px of climb per phase transition
+
+function skyColorsAt(heightClimbed) {
+  const u = Math.max(0, heightClimbed) / SKY_PHASE_HEIGHT;
+  const i = Math.min(SKY_PHASES.length - 2, Math.floor(u));
+  const frac = clamp01(u - i);
+  const a = SKY_PHASES[i], b = SKY_PHASES[i + 1];
+  return {
+    top: lerpColor(a.top, b.top, frac),
+    mid: lerpColor(a.mid, b.mid, frac),
+    bot: lerpColor(a.bot, b.bot, frac)
+  };
+}
+
+let skyStars = null;
+function initSkyStars() {
+  skyStars = [];
+  for (let i = 0; i < 40; i++) {
+    skyStars.push({ x: randRange(0, W), y: randRange(0, H * 3), r: randRange(0.6, 1.8), phase: randRange(0, Math.PI*2) });
+  }
+}
+
+function drawFlag(x, y, w, h, flag) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+
+  if (flag.pattern === 'horizontal') {
+    const weights = flag.weights || flag.colors.map(function(){ return 1; });
+    const total = weights.reduce(function(a,b){ return a+b; }, 0);
+    let curY = y;
+    for (let i = 0; i < flag.colors.length; i++) {
+      const sh = (weights[i] / total) * h;
+      ctx.fillStyle = flag.colors[i];
+      ctx.fillRect(x, curY, w, sh);
+      curY += sh;
+    }
+  } else if (flag.pattern === 'vertical') {
+    const sw = w / flag.colors.length;
+    for (let i = 0; i < flag.colors.length; i++) {
+      ctx.fillStyle = flag.colors[i];
+      ctx.fillRect(x + i * sw, y, sw + 1, h);
+    }
+  } else if (flag.pattern === 'stripes4') {
+    const n = 5;
+    const sh = h / n;
+    for (let i = 0; i < n; i++) {
+      ctx.fillStyle = flag.colors[i % 2];
+      ctx.fillRect(x, y + i * sh, w, sh + 1);
+    }
+  } else if (flag.pattern === 'cross') {
+    ctx.fillStyle = flag.bg;
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = flag.accent;
+    ctx.fillRect(x, y + h/2 - h*0.09, w, h*0.18);
+    ctx.fillRect(x + w/2 - w*0.09, y, w*0.18, h);
+  } else if (flag.pattern === 'mexico') {
+    const sw = w / 3;
+    const cols = ['#006847', '#f0f0f0', '#CE1126'];
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = cols[i];
+      ctx.fillRect(x + i * sw, y, sw + 1, h);
+    }
+    // eagle emblem simplified as a small brown/gold mark on the center band
+    ctx.fillStyle = '#8a5a2b';
+    ctx.beginPath();
+    ctx.ellipse(x + w/2, y + h/2, w*0.055, h*0.16, 0, 0, Math.PI*2);
+    ctx.fill();
+  } else if (flag.pattern === 'usa') {
+    const n = 7;
+    const sh = h / n;
+    for (let i = 0; i < n; i++) {
+      ctx.fillStyle = i % 2 === 0 ? '#B22234' : '#f0f0f0';
+      ctx.fillRect(x, y + i * sh, w, sh + 1);
+    }
+    ctx.fillStyle = '#3C3B6E';
+    ctx.fillRect(x, y, w * 0.42, h * 0.5);
+    ctx.fillStyle = '#f0f0f0';
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 4; c++) {
+        ctx.beginPath();
+        ctx.arc(x + w*0.06 + c * w*0.1, y + h*0.1 + r * h*0.15, Math.max(0.8, w*0.016), 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+  } else if (flag.pattern === 'japan') {
+    ctx.fillStyle = '#f0f0f0';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#BC002D';
+    ctx.beginPath();
+    ctx.arc(x + w/2, y + h/2, h * 0.3, 0, Math.PI*2);
+    ctx.fill();
+  } else if (flag.pattern === 'morocco') {
+    ctx.fillStyle = '#C1272D';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = '#006233';
+    ctx.lineWidth = Math.max(1, w * 0.03);
+    polygonPath(ctx, x + w/2, y + h/2, h * 0.3, 5, -Math.PI/2);
+    ctx.stroke();
+  } else if (flag.pattern === 'brazil') {
+    ctx.fillStyle = '#009739';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#FEDD00';
+    ctx.beginPath();
+    ctx.moveTo(x + w/2, y + h*0.12);
+    ctx.lineTo(x + w*0.88, y + h/2);
+    ctx.lineTo(x + w/2, y + h*0.88);
+    ctx.lineTo(x + w*0.12, y + h/2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#002776';
+    ctx.beginPath();
+    ctx.arc(x + w/2, y + h/2, h*0.22, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// The higher you climb, the more decorated the country tier — with 16 nations,
+// a shorter tier height keeps the top (Brazil) reachable in a strong run.
+const HEIGHT_PER_FLAG = 380;
+
+// Birds glide across the daytime sky; shooting stars streak across the night
+let birds = [];
+function initBirds() {
+  birds = [];
+  for (let i = 0; i < 3; i++) {
+    birds.push({ x: randRange(0, W), y: randRange(40, 200), speed: randRange(0.25, 0.5), phase: randRange(0, Math.PI*2) });
+  }
+}
+let shootingStar = null;
+
+function drawBirds(t) {
+  const a = clamp01(1 - t * 2.2);
+  if (a < 0.05) return;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(50,60,80,' + (0.5 * a) + ')';
+  ctx.lineWidth = 1.6;
+  for (const b of birds) {
+    b.x += b.speed;
+    if (b.x > W + 20) { b.x = -20; b.y = randRange(40, 200); }
+    b.phase += 0.12;
+    const flap = Math.sin(b.phase) * 3;
+    ctx.beginPath();
+    ctx.moveTo(b.x - 5, b.y - flap);
+    ctx.quadraticCurveTo(b.x, b.y + 2, b.x, b.y);
+    ctx.quadraticCurveTo(b.x, b.y + 2, b.x + 5, b.y - flap);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawShootingStar(t) {
+  if (t < 0.5) { shootingStar = null; return; }
+  if (!shootingStar && Math.random() < 0.004) {
+    shootingStar = { x: randRange(W*0.2, W*0.9), y: randRange(20, 140), vx: -randRange(4, 7), vy: randRange(1.5, 3), life: 26 };
+  }
+  if (shootingStar) {
+    const s = shootingStar;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, s.life / 12);
+    const grad = ctx.createLinearGradient(s.x, s.y, s.x - s.vx * 6, s.y - s.vy * 6);
+    grad.addColorStop(0, 'rgba(255,255,255,0.95)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.y);
+    ctx.lineTo(s.x - s.vx * 6, s.y - s.vy * 6);
+    ctx.stroke();
+    ctx.restore();
+    s.x += s.vx; s.y += s.vy; s.life--;
+    if (s.life <= 0) shootingStar = null;
+  }
+}
+
+// Distant mountain silhouettes: two ridge layers with a slow horizontal
+// parallax drift as you climb, tinted to match the current sky phase
+function drawMountains(t) {
+  const drift = cameraY * 0.03;
+  const layers = [
+    { base: H * 0.80, amp: 26, freq: 0.012, alpha: 0.16, speed: 0.5 },
+    { base: H * 0.86, amp: 38, freq: 0.008, alpha: 0.22, speed: 1.0 }
+  ];
+  const shade = t < 0.5 ? '43,68,102' : '10,14,30';
+  for (const L of layers) {
+    ctx.fillStyle = 'rgba(' + shade + ',' + L.alpha + ')';
+    ctx.beginPath();
+    ctx.moveTo(0, H);
+    for (let x = 0; x <= W; x += 8) {
+      const wx = x + drift * L.speed;
+      const y = L.base
+        - Math.abs(Math.sin(wx * L.freq)) * L.amp
+        - Math.sin(wx * L.freq * 2.7 + 1.3) * L.amp * 0.35;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(W, H);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+function drawSunMoon(t) {
+  // sun in the day, crossfading into a crescent moon as difficulty darkens the sky
+  const cx = W * 0.78, cy = 74;
+  ctx.save();
+
+  // sun (fades out as t rises)
+  const sunA = clamp01(1 - t * 1.8);
+  if (sunA > 0.02) {
+    ctx.globalAlpha = sunA;
+    const sg = ctx.createRadialGradient(cx, cy, 2, cx, cy, 26);
+    sg.addColorStop(0, 'rgba(255,252,220,1)');
+    sg.addColorStop(0.5, 'rgba(255,225,120,0.9)');
+    sg.addColorStop(1, 'rgba(255,215,90,0)');
+    ctx.fillStyle = sg;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 26, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#fff4c2';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 13, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // moon (fades in as t rises)
+  const moonA = clamp01((t - 0.35) * 2.2);
+  if (moonA > 0.02) {
+    ctx.globalAlpha = moonA;
+    ctx.shadowColor = 'rgba(220,230,255,0.8)';
+    ctx.shadowBlur = 14;
+    ctx.fillStyle = '#e8edf7';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 12, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // crescent bite (sample sky color at that height)
+    ctx.fillStyle = skyColorsAt(cameraY).top;
+    ctx.beginPath();
+    ctx.arc(cx + 5, cy - 3, 10, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+
+function drawFloodlightPylon(x, leansRight) {
+  ctx.save();
+  const leanX = leansRight ? 6 : -6;
+  ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x, 46);
+  ctx.lineTo(x + leanX, -6);
+  ctx.stroke();
+  // lattice crossbeams
+  for (let i = 1; i <= 3; i++) {
+    const yy = 46 - i * 12;
+    const xx = x + (leanX * i) / 4;
+    ctx.beginPath();
+    ctx.moveTo(xx - 5, yy);
+    ctx.lineTo(xx + 5, yy);
+    ctx.stroke();
+  }
+  // light fixture cluster
+  ctx.fillStyle = 'rgba(255,250,220,0.55)';
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.arc(x + leanX + (i - 1) * 6, -8, 2.4, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawBackground(diff) {
+  const t = diff;
+  const sky = skyColorsAt(cameraY);
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, sky.top);
+  grad.addColorStop(0.55, sky.mid);
+  grad.addColorStop(1, sky.bot);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  drawSunMoon(t);
+  drawMountains(t);
+  drawBirds(t);
+  drawShootingStar(t);
+  drawFloodlightPylon(18, true);
+  drawFloodlightPylon(W - 18, false);
+
+  // stadium floodlight beams, more visible as the sky darkens (World Cup night-match vibe)
+  if (t > 0.1) {
+    ctx.save();
+    ctx.globalAlpha = clamp01((t - 0.1) / 0.6) * 0.35;
+    const beam1 = ctx.createLinearGradient(0, 0, W*0.4, H*0.7);
+    beam1.addColorStop(0, 'rgba(255,250,220,0.9)');
+    beam1.addColorStop(1, 'rgba(255,250,220,0)');
+    ctx.fillStyle = beam1;
+    ctx.beginPath();
+    ctx.moveTo(-10, -10);
+    ctx.lineTo(W*0.55, -10);
+    ctx.lineTo(W*0.1, H*0.75);
+    ctx.closePath();
+    ctx.fill();
+
+    const beam2 = ctx.createLinearGradient(W, 0, W*0.6, H*0.7);
+    beam2.addColorStop(0, 'rgba(255,250,220,0.9)');
+    beam2.addColorStop(1, 'rgba(255,250,220,0)');
+    ctx.fillStyle = beam2;
+    ctx.beginPath();
+    ctx.moveTo(W+10, -10);
+    ctx.lineTo(W*0.45, -10);
+    ctx.lineTo(W*0.9, H*0.75);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // twinkling stars fade in as it gets darker/harder
+  if (t > 0.15 && skyStars) {
+    ctx.save();
+    ctx.globalAlpha = clamp01((t - 0.15) / 0.5);
+    for (const st of skyStars) {
+      const sy = ((st.y + cameraY * 0.08) % (H + 40)) - 20;
+      const tw = 0.6 + 0.4 * Math.sin(st.phase + cameraY * 0.01);
+      ctx.globalAlpha = clamp01((t - 0.15) / 0.5) * tw;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(st.x, sy, st.r, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // distant parallax hills for depth
+  ctx.fillStyle = lerpColor([120,190,170], [30,25,60], t);
+  ctx.globalAlpha = 0.55;
+  drawHillLayer(cameraY * 0.12, 46, 90);
+  ctx.globalAlpha = 0.8;
+  ctx.fillStyle = lerpColor([90,170,140], [20,18,48], t);
+  drawHillLayer(cameraY * 0.22, 30, 70);
+  ctx.globalAlpha = 1;
+  drawCrowd(cameraY * 0.22, 70);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  for (const c of clouds) {
+    const cy = ((c.y + cameraY * c.speed * 0.3) % (H + 120)) - 60;
+    ctx.beginPath();
+    ctx.ellipse(c.x, cy, c.w*0.5, c.w*0.28, 0, 0, Math.PI*2);
+    ctx.ellipse(c.x - c.w*0.3, cy + 6, c.w*0.32, 0.2*c.w, 0, 0, Math.PI*2);
+    ctx.ellipse(c.x + c.w*0.3, cy + 6, c.w*0.32, 0.2*c.w, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+}
+
+function drawHillLayer(scrollY, amplitude, baseline) {
+  const wave = 70;
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  for (let x = 0; x <= W; x += 20) {
+    const y = H - baseline + Math.sin((x + scrollY) / wave) * amplitude * 0.5
+              + Math.sin((x + scrollY) * 0.5 / wave) * amplitude * 0.3;
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(W, H);
+  ctx.closePath();
+  ctx.fill();
+}
+
+let crowdDots = null;
+const CROWD_COLORS = ['#ffffff', '#ffe066', '#40c4ff', '#ff6b6b', '#69f0ae'];
+function initCrowd() {
+  crowdDots = [];
+  for (let i = 0; i < 90; i++) {
+    crowdDots.push({
+      x: randRange(0, W + 20),
+      jitter: randRange(-3, 3),
+      color: CROWD_COLORS[Math.floor(Math.random() * CROWD_COLORS.length)]
+    });
+  }
+}
+function drawCrowd(scrollY, baseline) {
+  if (!crowdDots) return;
+  const rowY = H - baseline - 3;
+  for (const d of crowdDots) {
+    const x = ((d.x + scrollY) % (W + 20)) - 10;
+    ctx.fillStyle = d.color;
+    ctx.globalAlpha = 0.5;
+    ctx.fillRect(x, rowY + d.jitter, 2.2, 2.2);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawStorm() {
+  if (stormY > H + 40) return; // not visible yet, skip
+  stormPulseT += 0.05;
+  const topY = stormY;
+  if (topY > H + 40) return;
+
+  ctx.save();
+  // jagged, roiling top edge
+  ctx.beginPath();
+  ctx.moveTo(0, H + 10);
+  const wave = 26;
+  for (let x = 0; x <= W; x += 10) {
+    const y = topY + Math.sin((x + stormPulseT * 40) / wave) * 8
+              + Math.sin((x * 0.6 - stormPulseT * 25)) * 5;
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(W, H + 10);
+  ctx.closePath();
+
+  const grad = ctx.createLinearGradient(0, topY - 10, 0, H + 10);
+  grad.addColorStop(0, 'rgba(40,15,55,0.05)');
+  grad.addColorStop(0.25, 'rgba(35,12,50,0.75)');
+  grad.addColorStop(1, 'rgba(15,5,25,0.97)');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // occasional flicker of lightning near the edge
+  if (Math.random() < 0.02) {
+    ctx.fillStyle = 'rgba(220,200,255,0.5)';
+    ctx.fillRect(0, topY - 4, W, 10);
+  }
+
+  // drifting wisps
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  for (let i = 0; i < 5; i++) {
+    const wx = (i * 83 + stormPulseT * 18) % (W + 40) - 20;
+    const wy = topY + 14 + Math.sin(stormPulseT + i) * 6;
+    ctx.beginPath();
+    ctx.ellipse(wx, wy, 16, 5, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawBarrier() {
+  if (!shieldActive) return;
+  const y = H - BARRIER_OFFSET;
+  const pulse = 0.5 + 0.5 * Math.sin(stormPulseT * 3);
+  ctx.save();
+  const grad = ctx.createLinearGradient(0, y - 10, 0, y + 10);
+  grad.addColorStop(0, 'rgba(64,196,255,0)');
+  grad.addColorStop(0.5, `rgba(120,220,255,${0.55 + pulse * 0.25})`);
+  grad.addColorStop(1, 'rgba(64,196,255,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, y - 10, W, 20);
+
+  ctx.strokeStyle = `rgba(255,255,255,${0.6 + pulse * 0.3})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  const wave = 22;
+  for (let x = 0; x <= W; x += 8) {
+    const wy = y + Math.sin((x + stormPulseT * 60) / wave) * 2.5;
+    if (x === 0) ctx.moveTo(x, wy); else ctx.lineTo(x, wy);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawFlagItem(f) {
+  if (f.collected) return;
+  if (!isFiniteNum(f.x) || !isFiniteNum(f.y)) return;
+  const bobY = f.y + Math.sin(f.bob) * 4;
+  const nation = FLAG_NATIONS[f.countryIdx] || FLAG_NATIONS[0];
+  const flutter = Math.sin(f.bob * 1.6) * 0.12;
+  const fw = FLAG_R * 2.2, fh = FLAG_R * 1.5;
+
+  ctx.save();
+  ctx.translate(f.x, bobY);
+  ctx.rotate(flutter);
+  ctx.shadowColor = 'rgba(0,0,0,0.3)';
+  ctx.shadowBlur = 5;
+
+  // pole
+  ctx.strokeStyle = '#8d6e4a';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-fw*0.5, -fh*0.6);
+  ctx.lineTo(-fw*0.5, fh*0.9);
+  ctx.stroke();
+  ctx.fillStyle = '#c9a876';
+  ctx.beginPath();
+  ctx.arc(-fw*0.5, -fh*0.6, 1.8, 0, Math.PI*2);
+  ctx.fill();
+
+  // flag
+  ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+  ctx.lineWidth = 1;
+  drawFlag(-fw*0.5, -fh*0.6, fw, fh, nation);
+  ctx.strokeRect(-fw*0.5, -fh*0.6, fw, fh);
+  ctx.restore();
+}
+
+function drawCandyItem(c) {
+  if (c.collected) return;
+  if (!isFiniteNum(c.x) || !isFiniteNum(c.y)) return;
+  const bobY = c.y + Math.sin(c.bob) * 4;
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.25)';
+  ctx.shadowBlur = 6;
+  drawCandy(ctx, c.x, bobY, CANDY_R, c.color, c.twist);
+  ctx.restore();
+}
+
+function drawGiftItem(g) {
+  if (g.collected) return;
+  if (!isFiniteNum(g.x) || !isFiniteNum(g.y)) return;
+  const bobY = g.y + Math.sin(g.bob) * 4;
+  const r = GIFT_R;
+  ctx.save();
+  ctx.translate(g.x, bobY);
+  ctx.shadowColor = 'rgba(64,196,255,0.9)';
+  ctx.shadowBlur = 10;
+
+  // box
+  ctx.fillStyle = '#40c4ff';
+  roundRectPath(ctx, -r, -r*0.75, r*2, r*1.5, 2.5);
+  ctx.fill();
+  ctx.fillStyle = '#1a8fd1';
+  roundRectPath(ctx, -r, r*0.05, r*2, r*0.5, 2);
+  ctx.fill();
+
+  // ribbon
+  ctx.fillStyle = '#fff176';
+  ctx.fillRect(-r*0.18, -r*0.75, r*0.36, r*1.5);
+  ctx.beginPath();
+  ctx.moveTo(-r*0.5, -r*0.75);
+  ctx.lineTo(0, -r*0.15);
+  ctx.lineTo(r*0.5, -r*0.75);
+  ctx.lineTo(r*0.3, -r*0.95);
+  ctx.lineTo(0, -r*0.7);
+  ctx.lineTo(-r*0.3, -r*0.95);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawPlatform(p) {
+  if (!isFiniteNum(p.x) || !isFiniteNum(p.y) || !isFiniteNum(p.w)) return;
+  if (p.y < -30 || p.y > H + 30) return;
+  const dip = p.dip && p.dip > 0.3 ? p.dip : 0;
+  if (dip) { ctx.save(); ctx.translate(0, dip); }
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.25)';
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetY = 3;
+  const grad = ctx.createLinearGradient(p.x, p.y, p.x, p.y + PLATFORM_H);
+  if (p.moving) {
+    grad.addColorStop(0, '#ffe066');
+    grad.addColorStop(1, '#f7931e');
+  } else {
+    grad.addColorStop(0, '#7ee08a');
+    grad.addColorStop(1, '#2fa84f');
+  }
+  ctx.fillStyle = grad;
+  roundRectPath(ctx, p.x, p.y, p.w, PLATFORM_H, 7);
+  ctx.fill();
+  ctx.restore();
+  // subtle top-light sheen for a rounded, lit look
+  ctx.fillStyle = 'rgba(255,255,255,0.28)';
+  roundRectPath(ctx, p.x + 3, p.y + 1.5, p.w - 6, 3, 2);
+  ctx.fill();
+
+  ctx.fillStyle = p.moving ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.35)';
+  ctx.beginPath();
+  roundRectPath(ctx, p.x + 3, p.y + 2, p.w - 6, 3, 2);
+  ctx.fill();
+
+  if (!p.moving) {
+    ctx.fillStyle = '#1e8449';
+    for (let i = 0; i < 4; i++) {
+      const tx = p.x + 6 + i * (p.w - 12) / 3;
+      ctx.beginPath();
+      ctx.moveTo(tx, p.y);
+      ctx.lineTo(tx + 3, p.y - 5);
+      ctx.lineTo(tx + 6, p.y);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else {
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    const cx = p.x + p.w/2;
+    const cy = p.y + PLATFORM_H/2;
+    const ax = p.dir * 5;
+    ctx.beginPath();
+    ctx.moveTo(cx + ax, cy);
+    ctx.lineTo(cx - ax*0.3, cy - 3);
+    ctx.lineTo(cx - ax*0.3, cy + 3);
+    ctx.closePath();
+    ctx.fill();
+  }
+  if (dip) ctx.restore();
+}
+
+function polygonPath(ctx, cx, cy, radius, sides, rotation) {
+  ctx.beginPath();
+  const step = (Math.PI * 2) / sides;
+  for (let i = 0; i < sides; i++) {
+    const a = rotation + i * step;
+    const px = cx + Math.cos(a) * radius;
+    const py = cy + Math.sin(a) * radius;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+}
+
+// Slim vertical progress rail on the right edge: every racer's dot climbs
+// toward the trophy at the top as they approach the race target
+function drawRaceProgress() {
+  if (gameMode !== 'race' || raceCountdown > 0) return;
+  const x = W - 9;
+  const top = 150, bottom = H - 130;
+  ctx.save();
+  // rail
+  ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x, top);
+  ctx.lineTo(x, bottom);
+  ctx.stroke();
+  // finish trophy
+  ctx.font = '13px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('🏆', x, top - 8);
+  // racer dots
+  const entries = raceStandings();
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const e = entries[i];
+    if (e.out) continue;
+    const frac = Math.min(1, e.climb / raceTarget);
+    const y = bottom - (bottom - top) * frac;
+    ctx.beginPath();
+    ctx.arc(x, y, e.you ? 5 : 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = e.color;
+    ctx.fill();
+    if (e.you) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawBotMarker(b, arrow, y) {
+  // top-edge markers stay clear of the standings panel on the left
+  const minX = (arrow === '▲') ? 150 : 20;
+  const x = Math.max(minX, Math.min(W - 22, b.x));
+  ctx.save();
+  ctx.translate(x, y);
+  // the bot's own ball, ghosted
+  ctx.globalAlpha = 0.4;
+  drawTriondaCharacter(9, 1);
+  ctx.fillStyle = b.color;
+  ctx.beginPath();
+  ctx.arc(0, 0, 9, 0, Math.PI*2);
+  ctx.fill();
+  ctx.globalAlpha = 0.75;
+  ctx.strokeStyle = b.color;
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.arc(0, 0, 10.4, 0, Math.PI*2);
+  ctx.stroke();
+  // direction arrow and name
+  ctx.globalAlpha = 0.95;
+  ctx.textAlign = 'center';
+  ctx.fillStyle = b.color;
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+  ctx.font = '800 9px sans-serif';
+  const arrowY = arrow === '▲' ? -15 : 21;
+  ctx.strokeText(arrow, 0, arrowY);
+  ctx.fillText(arrow, 0, arrowY);
+  ctx.font = '800 8.5px sans-serif';
+  const nameY = arrow === '▲' ? 22 : -14;
+  ctx.strokeText(b.name, 0, nameY);
+  ctx.fillText(b.name, 0, nameY);
+  ctx.restore();
+}
+
+function drawBots() {
+  for (const b of bots) {
+    if (b.eliminated) continue;
+    // bots ahead of the view: colored arrow + name at the top edge
+    if (b.ahead) {
+      drawBotMarker(b, '▲', 56 + b.id * 34); // fixed slot per bot — no shuffling
+      continue;
+    }
+    if (!isFiniteNum(b.x) || !isFiniteNum(b.y)) continue;
+    if (b.y < -32 || b.y > H + 20) continue;
+    if (b.y < -20 || b.y > H + 20) continue;
+    const facing = b.vx < 0 ? -1 : 1;
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    // blink during post-revive grace
+    const blinking = b.grace > 0 && Math.floor(b.grace / 6) % 2 === 0;
+    ctx.globalAlpha = blinking ? 0.2 : 0.52;
+
+    // same character as the player, at bot size
+    b.spin = (b.spin || 0) + b.vx * 0.05;
+    drawTriondaCharacter(11, facing, b.spin);
+
+    // single-color identity tint over the whole ball
+    ctx.globalAlpha = blinking ? 0.1 : 0.24;
+    ctx.fillStyle = b.color;
+    ctx.beginPath();
+    ctx.arc(0, 0, 11, 0, Math.PI*2);
+    ctx.fill();
+
+    // identity ring so the bot reads instantly at a glance
+    ctx.globalAlpha = blinking ? 0.3 : 0.65;
+    ctx.strokeStyle = b.color;
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.arc(0, 0, 12.6, 0, Math.PI*2);
+    ctx.stroke();
+
+    // name tag: outlined for readability over any background
+    ctx.globalAlpha = 0.8;
+    ctx.font = '800 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+    ctx.strokeText(b.name, 0, -19);
+    ctx.fillStyle = b.color;
+    ctx.fillText(b.name, 0, -19);
+
+    // live rank above the head (🏆 for the leader)
+    if (raceRanks[b.name]) {
+      const rl = rankLabel(raceRanks[b.name]);
+      ctx.font = rl === '🏆' ? '12px sans-serif' : '800 9px sans-serif';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      if (rl !== '🏆') ctx.strokeText(rl, 0, -30);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(rl, 0, -30);
+    }
+
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawBallTrail() {
+  // fading ghost circles behind the ball; stronger when moving fast, golden during boost
+  const speed = Math.abs(ball.vx) + Math.abs(ball.vy);
+  if (speed < 4 && boostTimer <= 0) return;
+  const boosted = boostTimer > 0;
+  for (let i = 0; i < ballTrail.length - 1; i++) {
+    const bt = ballTrail[i];
+    const frac = (i + 1) / ballTrail.length;
+    ctx.globalAlpha = frac * (boosted ? 0.34 : 0.16);
+    ctx.fillStyle = boosted ? '#ffd54f' : '#ffffff';
+    ctx.beginPath();
+    ctx.arc(bt.x, bt.y, ball.r * (0.45 + frac * (boosted ? 0.62 : 0.4)), 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawVignette() {
+  // subtle darkened corners for depth and focus
+  const vg = ctx.createRadialGradient(W/2, H/2, H*0.42, W/2, H/2, H*0.75);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(10,15,35,0.22)');
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+}
+
+// Draws the full Trionda ball character (skin + face) centered at the current
+// origin. Used by the player at full size and by the bots at a smaller radius.
+function drawTriondaCharacter(r, facing, spin) {
+  // World Cup 2026 "Trionda"-style skin: white base with three curved
+  // triangular panels in the host nations' red, blue, and green, plus gold accents
+  const g = ctx.createRadialGradient(-r*0.35, -r*0.4, 2, 0, 0, r*1.3);
+  g.addColorStop(0, '#ffffff');
+  g.addColorStop(0.75, '#f4f4f4');
+  g.addColorStop(1, '#dcdcdc');
+  ctx.beginPath();
+  ctx.fillStyle = g;
+  ctx.arc(0, 0, r, 0, Math.PI*2);
+  ctx.fill();
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI*2);
+  ctx.clip();
+  if (spin) ctx.rotate(spin); // panels spin with movement; the face stays upright
+
+  // three swooping panels rotated 120° apart (red = USA, green = Mexico, blue = Canada/USA)
+  const panelColors = ['#d5281b', '#0a7a3d', '#1f4e9c'];
+  for (let i = 0; i < 3; i++) {
+    const a = i * (Math.PI * 2 / 3) + Math.PI / 6;
+    ctx.save();
+    ctx.rotate(a);
+    ctx.fillStyle = panelColors[i];
+    ctx.beginPath();
+    // curved triangle sweeping from near-center out to the rim
+    ctx.moveTo(r * 0.16, 0);
+    ctx.quadraticCurveTo(r * 0.55, -r * 0.5, r * 1.12, -r * 0.28);
+    ctx.quadraticCurveTo(r * 1.0, r * 0.32, r * 0.5, r * 0.42);
+    ctx.quadraticCurveTo(r * 0.3, r * 0.2, r * 0.16, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // gold accent dots at the panel junctions
+  ctx.fillStyle = '#d9a821';
+  for (let i = 0; i < 3; i++) {
+    const a = i * (Math.PI * 2 / 3) + Math.PI / 6 + Math.PI / 3;
+    ctx.beginPath();
+    ctx.arc(Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.55, r * 0.09, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // subtle sheen and rim
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(-r*0.35, -r*0.42, r*0.45, r*0.22, -0.6, 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI*2);
+  ctx.stroke();
+  ctx.restore();
+
+  // white face patch so the eyes and smile stay readable over the colored panels
+  const u = r / 14; // face features scale (designed at r=14)
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.beginPath();
+  ctx.ellipse(facing * 1.5 * u, 0.5 * u, r * 0.62, r * 0.56, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  const eyeOffset = facing * 3 * u;
+  ctx.fillStyle = '#2c3e50';
+  ctx.beginPath();
+  ctx.arc(-5*u + eyeOffset, -3*u, 2.4*u, 0, Math.PI*2);
+  ctx.arc(5*u + eyeOffset, -3*u, 2.4*u, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(-5*u + eyeOffset + 0.8*u, -3.8*u, 0.8*u, 0, Math.PI*2);
+  ctx.arc(5*u + eyeOffset + 0.8*u, -3.8*u, 0.8*u, 0, Math.PI*2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(eyeOffset*0.5, 4*u, 5*u, 0.15*Math.PI, 0.85*Math.PI, false);
+  ctx.strokeStyle = '#2c3e50';
+  ctx.lineWidth = 1.5*u;
+  ctx.stroke();
+}
+
+function drawBall() {
+  if (playerEliminated) return;
+  ctx.save();
+  ctx.translate(ball.x, ball.y);
+  const squash = Math.min(1.25, Math.max(0.8, 1 - ball.vy * 0.01));
+  ctx.scale(1/squash, squash);
+
+  // blink while in post-revive grace period
+  if (reviveGraceTimer > 0 && Math.floor(reviveGraceTimer / 6) % 2 === 0) {
+    ctx.globalAlpha = 0.45;
+  }
+
+  if (shieldActive) {
+    const pulse = 0.5 + 0.5 * Math.sin(stormPulseT * 4);
+    ctx.beginPath();
+    ctx.arc(0, 0, ball.r + 5 + pulse * 2, 0, Math.PI*2);
+    ctx.strokeStyle = `rgba(64,196,255,${0.5 + pulse * 0.35})`;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+  }
+
+  ctx.beginPath();
+  ctx.ellipse(0, ball.r + 4, ball.r*0.8, ball.r*0.25, 0, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  ctx.fill();
+
+  ball.spin = (ball.spin || 0) + ball.vx * 0.045;
+  drawTriondaCharacter(ball.r, ball.facing, ball.spin);
+
+  // live rank above the head (🏆 when leading)
+  if (gameMode === 'race' && raceRanks['YOU']) {
+    ctx.globalAlpha = 1;
+    const rl = rankLabel(raceRanks['YOU']);
+    ctx.font = rl === '🏆' ? '14px sans-serif' : '800 11px sans-serif';
+    ctx.textAlign = 'center';
+    if (rl !== '🏆') {
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      ctx.strokeText(rl, 0, -ball.r - 10);
+    }
+    ctx.fillStyle = '#ffe066';
+    ctx.fillText(rl, 0, -ball.r - 10);
+  }
+  ctx.restore();
+}
+
+function drawParticles() {
+  for (const pt of particles) {
+    ctx.globalAlpha = Math.max(0, pt.life / 28);
+    ctx.fillStyle = pt.color;
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, 2.4, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawTrophy() {
+  if (trophyTimer <= 0) return;
+  const fade = Math.min(1, trophyTimer / 60); // fade out in last second
+  const bobT = stormPulseT * 2;
+  const tx = ball.x;
+  const ty = ball.y - ball.r - 34 + Math.sin(bobT) * 3;
+
+  ctx.save();
+  ctx.globalAlpha = fade;
+  ctx.translate(tx, ty);
+  ctx.shadowColor = 'rgba(255,215,0,0.9)';
+  ctx.shadowBlur = 14;
+
+  // FIFA World Cup trophy: two figures spiraling upward, holding the globe,
+  // on a base ringed with malachite-green bands
+  const gold = ctx.createLinearGradient(0, -16, 0, 14);
+  gold.addColorStop(0, '#ffe985');
+  gold.addColorStop(0.5, '#f0bd2d');
+  gold.addColorStop(1, '#b8860b');
+
+  // base
+  ctx.fillStyle = gold;
+  roundRectPath(ctx, -7.5, 8, 15, 6, 2);
+  ctx.fill();
+  // malachite bands on the base
+  ctx.fillStyle = '#0e5c3f';
+  ctx.fillRect(-7.5, 9.4, 15, 1.4);
+  ctx.fillRect(-7.5, 12.2, 15, 1.4);
+
+  // the two spiraling figures: an hourglass body widening as it rises
+  ctx.fillStyle = gold;
+  ctx.beginPath();
+  ctx.moveTo(-5.5, 8);
+  ctx.quadraticCurveTo(-2.2, 2, -3.5, -3);   // left figure leaning in
+  ctx.quadraticCurveTo(-4.5, -7, -7, -9);    // left arm reaching up/out
+  ctx.quadraticCurveTo(-3, -8.5, -1, -6.5);  // hand toward globe
+  ctx.lineTo(1, -6.5);
+  ctx.quadraticCurveTo(3, -8.5, 7, -9);      // right arm
+  ctx.quadraticCurveTo(4.5, -7, 3.5, -3);    // right figure
+  ctx.quadraticCurveTo(2.2, 2, 5.5, 8);
+  ctx.closePath();
+  ctx.fill();
+
+  // the globe on top
+  const globe = ctx.createRadialGradient(-2, -13, 1, 0, -11.5, 6.5);
+  globe.addColorStop(0, '#fff3b0');
+  globe.addColorStop(0.6, '#f0bd2d');
+  globe.addColorStop(1, '#c08a12');
+  ctx.fillStyle = globe;
+  ctx.beginPath();
+  ctx.arc(0, -11.5, 6, 0, Math.PI*2);
+  ctx.fill();
+
+  // faint continents/latitude etching on the globe
+  ctx.strokeStyle = 'rgba(140,95,15,0.55)';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.ellipse(0, -11.5, 6, 2.2, 0, 0, Math.PI*2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(0, -11.5, 3, 6, 0, 0, Math.PI*2);
+  ctx.stroke();
+
+  // shine on the globe
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.beginPath();
+  ctx.ellipse(-2, -13.5, 1.8, 1.1, -0.5, 0, Math.PI*2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawConfetti() {
+  for (const cf of confetti) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, cf.life / cf.maxLife);
+    ctx.translate(cf.x, cf.y);
+    ctx.rotate(cf.rot);
+    ctx.fillStyle = cf.color;
+    ctx.fillRect(-cf.w/2, -cf.h/2, cf.w, cf.h);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawPopups() {
+  for (const pu of popups) {
+    ctx.globalAlpha = Math.max(0, pu.life / 45);
+    ctx.fillStyle = pu.color;
+    ctx.font = 'bold 16px Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(pu.text, pu.x, pu.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function draw() {
+  const diff = difficultyAt(cameraY);
+  drawBackground(diff);
+  for (const p of platforms) drawPlatform(p);
+  for (const f of flags) drawFlagItem(f);
+  for (const c of candies) drawCandyItem(c);
+  for (const g of gifts) drawGiftItem(g);
+  drawParticles();
+  drawStorm();
+  drawBarrier();
+  drawBots();
+  drawRaceProgress();
+  drawBallTrail();
+  drawBall();
+  drawTrophy();
+  drawConfetti();
+  drawPopups();
+  drawVignette();
+  if (goalGame.active) drawGoalGame();
+  if (flashTimer > 0) {
+    ctx.fillStyle = 'rgba(' + flashColor + ',' + (flashTimer / 16 * 0.26).toFixed(3) + ')';
+    ctx.fillRect(0, 0, W, H);
+  }
+}
+
+function showRealError(err) {
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#c0392b;color:white;padding:10px;font-family:monospace;font-size:12px;z-index:99999;white-space:pre-wrap;max-height:50%;overflow:auto;';
+  box.textContent = 'Error: ' + (err && err.stack ? err.stack : err);
+  document.body.appendChild(box);
+  running = false;
+}
+
+function loop() {
+  if (!running) return;
+  if (paused) {
+    rafId = requestAnimationFrame(loop);
+    return;
+  }
+  try {
+    update();
+    draw();
+    renderRaceBoard();
+    matchClockEl.textContent = formatMatchTime(Date.now() - matchStartTime);
+  } catch (err) {
+    showRealError(err);
+    return;
+  }
+  rafId = requestAnimationFrame(loop);
+}
+
+function startGame() {
+  try {
+    ensureAudio();
+    if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
+    overlay.classList.add('hidden');
+    resetGame();
+    playWhistle(false);
+    loop();
+  } catch (err) {
+    showRealError(err);
+  }
+}
+
+function showRaceResult(playerWon, winnerName, reason) {
+  raceWins[winnerName] = (raceWins[winnerName] || 0) + 1;
+  playWhistle(true);
+  stormWarning.classList.remove('show');
+  const standings = raceStandings();
+  const medals = ['🥇', '🥈', '🥉'];
+  const rows = '<div class="winsTable"><div class="wtHead"><span>🏁 FINAL STANDINGS</span><span></span></div>' +
+    standings.map(function(e, i) {
+      const medal = medals[i] || (i + 1) + '.';
+      const scoreCol = e.out ? '☠ OUT' : String(e.climb);
+      return '<div class="wtRow' + (e.you ? ' you' : '') + '"' + (e.out ? ' style="opacity:0.55"' : '') + '>' +
+        '<span>' + medal + ' <span class="dot" style="background:' + e.color + '"></span> ' + e.name + '</span>' +
+        '<span>' + scoreCol + '</span></div>';
+    }).join('') + '</div>';
+  if (playerWon) {
+    playChampionFanfare();
+    addConfetti(ball.x, ball.y - 20, 70);
+    raceTarget += 500; // each win raises the bar for the next race
+  }
+  const nextGoalLine = playerWon
+    ? '<p style="opacity:1;font-weight:800;color:#7ce8ff;">🎯 Next race: first to ' + raceTarget + '</p>'
+    : '';
+  // session-wide championship tally, rendered as a small table
+  const tallyColors = { 'YOU': '#ffe066' };
+  BOT_CONFIG.forEach(function(c) { tallyColors[c.name] = c.color; });
+  const tallyRows = ['YOU'].concat(BOT_CONFIG.map(function(c) { return c.name; }))
+    .map(function(n) { return { n: n, w: raceWins[n] || 0 }; })
+    .sort(function(a, b) { return b.w - a.w; })
+    .map(function(e, i) {
+      return '<div class="wtRow' + (e.n === 'YOU' ? ' you' : '') + '">' +
+        '<span>' + (i + 1) + '. <span class="dot" style="background:' + tallyColors[e.n] + '"></span> ' + e.n + '</span>' +
+        '<span>' + e.w + '</span></div>';
+    }).join('');
+  const tallyLine = '<div class="winsTable"><div class="wtHead"><span>🏆 SESSION WINS</span><span></span></div>' + tallyRows + '</div>';
+  const elapsedMs = Date.now() - matchStartTime;
+  overlay.classList.remove('hidden');
+  overlay.innerHTML = `
+    <h1>${playerWon ? '🏆 CHAMPION!' : 'RACE OVER'}</h1>
+    <p style="opacity:1;font-weight:700;">${reason}</p>
+    ${rows}
+    ${tallyLine}
+    ${nextGoalLine}
+    <p>Distance: ${Math.round(cameraY / 10)}m &nbsp;·&nbsp; Match Time: ${formatMatchTime(elapsedMs)}</p>
+    <button id="playAgainBtn">Race Again</button>
+    <button id="menuBtn">Menu</button>
+  `;
+  const btn = document.getElementById('playAgainBtn');
+  btn.addEventListener('click', function() {
+    btn.disabled = true;
+    startGame();
+  });
+  document.getElementById('menuBtn').addEventListener('click', function() {
+    try { backToMenu(); } catch (err) { showRealError(err); }
+  });
+}
+
+function showGameOver() {
+  playWhistle(true);
+  stormWarning.classList.remove('show');
+  overlay.classList.remove('hidden');
+  const msg = deathReason === 'storm' ? 'Caught by the storm!' : 'You fell!';
+  const elapsedMs = Date.now() - matchStartTime;
+  const newTimeRecord = elapsedMs > bestTimeMs;
+  if (newTimeRecord) bestTimeMs = elapsedMs;
+  const elapsed = formatMatchTime(elapsedMs);
+  const distM = Math.round(cameraY / 10);
+  const newHeightRecord = distM > bestHeight;
+  if (newHeightRecord) bestHeight = distM;
+  const standings = raceStandings();
+  const place = standings.findIndex(function(e) { return e.you; }) + 1;
+  const placeLabel = ['🥇 1st', '🥈 2nd', '🥉 3rd', '4th'][place - 1] || place + 'th';
+  const placementLine = gameMode === 'race'
+    ? '<p style="opacity:1;font-weight:800;font-size:16px;">Finished ' + placeLabel + ' of ' + standings.length + '</p>'
+    : '';
+  overlay.innerHTML = `
+    <h1>FULL TIME</h1>
+    <p style="opacity:1;font-weight:700;">${msg}</p>
+    ${placementLine}
+    <p>Score: <b>${score}</b> &nbsp;(best ${Math.max(best, score)})${score >= best && score > 0 ? ' 🏆' : ''}</p>
+    <p>Distance: <b>${distM}m</b> &nbsp;(best ${bestHeight}m)${newHeightRecord ? ' 🏆' : ''}</p>
+    <p>Time: <b>${elapsed}</b> &nbsp;(best ${formatMatchTime(bestTimeMs)})${newTimeRecord ? ' 🏆' : ''}</p>
+    <p>🚩 ${flagsCollectedCount} flags collected</p>
+    <button id="playAgainBtn">Play Again</button>
+    <button id="menuBtn">Menu</button>
+  `;
+  const btn = document.getElementById('playAgainBtn');
+  btn.addEventListener('click', function() {
+    btn.disabled = true;
+    startGame();
+  });
+  document.getElementById('menuBtn').addEventListener('click', function() {
+    try { backToMenu(); } catch (err) { showRealError(err); }
+  });
+}
+
+// The menu HTML is saved so end screens can return to it (mode selection included).
+// innerHTML replacement destroys listeners, so wiring must be re-attachable.
+const MENU_HTML = overlay.innerHTML;
+
+function wireMenu() {
+  const sBtn = document.getElementById('startBtn');
+  sBtn.addEventListener('click', function() {
+    try { sBtn.disabled = true; startGame(); } catch (err) { showRealError(err); }
+  });
+  const goalEl = document.getElementById('raceChipGoal');
+  if (goalEl) goalEl.textContent = 'first to ' + raceTarget;
+  const diffSel = document.getElementById('diffSelect');
+  diffSel.classList.toggle('show', gameMode === 'race');
+  document.querySelectorAll('.diffChip').forEach(function(chip) {
+    chip.classList.toggle('selected', chip.dataset.diff === raceDifficulty);
+    chip.addEventListener('click', function() {
+      try {
+        raceDifficulty = chip.dataset.diff;
+        document.querySelectorAll('.diffChip').forEach(function(c) { c.classList.remove('selected'); });
+        chip.classList.add('selected');
+      } catch (err) { showRealError(err); }
+    });
+  });
+  document.querySelectorAll('.modeChip').forEach(function(chip) {
+    // reflect the current mode selection
+    chip.classList.toggle('selected', chip.dataset.mode === gameMode);
+    chip.addEventListener('click', function() {
+      try {
+        gameMode = chip.dataset.mode;
+        document.querySelectorAll('.modeChip').forEach(function(c) { c.classList.remove('selected'); });
+        chip.classList.add('selected');
+        document.getElementById('diffSelect').classList.toggle('show', gameMode === 'race');
+      } catch (err) { showRealError(err); }
+    });
+  });
+}
+wireMenu();
+
+function backToMenu() {
+  overlay.innerHTML = MENU_HTML;
+  overlay.classList.remove('hidden');
+  wireMenu();
+}
+
+document.getElementById('pauseBtn').addEventListener('click', function() {
+  try { togglePause(); } catch (err) { showRealError(err); }
+});
+document.getElementById('resumeBtn').addEventListener('click', function() {
+  try { if (paused) togglePause(); } catch (err) { showRealError(err); }
+});
+document.getElementById('pauseMenuBtn').addEventListener('click', function() {
+  try {
+    paused = false;
+    running = false;
+    pauseOverlayEl.classList.remove('show');
+    stormWarning.classList.remove('show');
+    backToMenu();
+  } catch (err) { showRealError(err); }
+});
+
+document.addEventListener('keydown', function(e) {
+  try {
+    if (goalGame.active) {
+      if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') { togglePause(); return; }
+      if (e.key === ' ' || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp') { kickGoalBall(); }
+      return;
+    }
+    if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') { togglePause(); return; }
+    if (paused) return; // ignore steering while paused
+    if (e.key === 'ArrowLeft' || e.key === 'a') { keys.left = true; leftZone.classList.add('active'); }
+    if (e.key === 'ArrowRight' || e.key === 'd') { keys.right = true; rightZone.classList.add('active'); }
+  } catch (err) { showRealError(err); }
+});
+document.addEventListener('keyup', function(e) {
+  try {
+    if (e.key === 'ArrowLeft' || e.key === 'a') { keys.left = false; leftZone.classList.remove('active'); }
+    if (e.key === 'ArrowRight' || e.key === 'd') { keys.right = false; rightZone.classList.remove('active'); }
+  } catch (err) { showRealError(err); }
+});
+
+const leftZone = document.getElementById('leftZone');
+const rightZone = document.getElementById('rightZone');
+
+function spawnRipple(zone, x, y) {
+  const r = document.createElement('span');
+  r.className = 'ripple';
+  r.style.left = x + 'px';
+  r.style.top = y + 'px';
+  zone.appendChild(r);
+  setTimeout(function(){ r.remove(); }, 600);
+}
+
+function pressZone(zone, side, clientX, clientY) {
+  if (goalGame.active) { kickGoalBall(); return; }
+  if (playerEliminated) return; // spectators don't steer
+  zone.classList.add('active');
+  if (side === 'left') { keys.left = true; keys.right = false; }
+  else { keys.right = true; keys.left = false; }
+  const rect = zone.getBoundingClientRect();
+  spawnRipple(zone, clientX - rect.left, clientY - rect.top);
+  ensureAudio();
+}
+
+function releaseZone(zone, side) {
+  zone.classList.remove('active');
+  if (side === 'left') keys.left = false;
+  else keys.right = false;
+}
+
+[[leftZone, 'left'], [rightZone, 'right']].forEach(function(pair) {
+  const zone = pair[0], side = pair[1];
+
+  zone.addEventListener('touchstart', function(e) {
+    try {
+      e.preventDefault();
+      const t = e.touches[0];
+      pressZone(zone, side, t ? t.clientX : 0, t ? t.clientY : 0);
+    } catch (err) { showRealError(err); }
+  }, { passive: false });
+
+  zone.addEventListener('touchend', function(e) {
+    try { e.preventDefault(); releaseZone(zone, side); } catch (err) { showRealError(err); }
+  }, { passive: false });
+
+  zone.addEventListener('touchcancel', function(e) {
+    try { releaseZone(zone, side); } catch (err) { showRealError(err); }
+  });
+
+  zone.addEventListener('mousedown', function(e) {
+    try { pressZone(zone, side, e.clientX, e.clientY); } catch (err) { showRealError(err); }
+  });
+  zone.addEventListener('mouseup', function() {
+    try { releaseZone(zone, side); } catch (err) { showRealError(err); }
+  });
+  zone.addEventListener('mouseleave', function() {
+    try { releaseZone(zone, side); } catch (err) { showRealError(err); }
+  });
+});
+
+// --- Staged boot: run each init step in its own animation frame so the loading
+// screen paints and animates instantly, with the bar tracking real progress ---
+(function bootSequence() {
+  const loader = document.getElementById('loader');
+  const loaderBar = document.getElementById('loaderBar');
+  const steps = [
+    initClouds,
+    initCrowd,
+    initBirds,
+    initSkyStars,
+    initHills,
+    function warmCanvas() { drawBackground(0); }, // pre-render so Start is instant
+  ];
+  let i = 0;
+  function runStep() {
+    try {
+      if (i < steps.length) {
+        steps[i]();
+        i++;
+        loaderBar.style.width = Math.round((i / steps.length) * 100) + '%';
+        requestAnimationFrame(runStep);
+      } else {
+        // brief beat at 100% so the bar visibly completes, then fade out
+        setTimeout(function() {
+          loader.classList.add('fadeOut');
+          setTimeout(function() { loader.remove(); }, 450);
+        }, 180);
+      }
+    } catch (err) {
+      loader.remove(); // never let the loader block the game
+      showRealError(err);
+    }
+  }
+  requestAnimationFrame(runStep);
+})();
+
+} catch (err) {
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#c0392b;color:white;padding:10px;font-family:monospace;font-size:12px;z-index:99999;white-space:pre-wrap;max-height:50%;overflow:auto;';
+  box.textContent = 'Setup Error: ' + (err && err.stack ? err.stack : err);
+  document.body.appendChild(box);
+}
+</script>
+</body>
+</html>
