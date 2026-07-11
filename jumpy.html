@@ -737,13 +737,22 @@ window.addEventListener('error', function(e) {
 try {
 
 const canvas = document.getElementById('game');
-// The world's logical height adapts to the screen's aspect ratio (once, at load),
-// so tall phones get a genuinely taller playfield instead of letterbox bands
-(function fitLogicalHeight() {
+// The world's logical size adapts to the screen's aspect ratio (once, at load):
+// tall phones get a taller playfield, wide tablets get a WIDER one — no bands
+(function fitLogicalSize() {
   const vw = Math.max(300, window.innerWidth);
   const vh = Math.max(480, window.innerHeight);
-  const aspectH = Math.round(400 * vh / vw);
-  canvas.height = Math.max(700, Math.min(960, aspectH));
+  const aspect = vw / vh;
+  let w = 400, h = Math.round(400 / aspect);
+  if (h < 700) {
+    // squarish/wide screen (iPad): keep the tuned 700 height, widen the pitch
+    h = 700;
+    w = Math.min(560, Math.round(700 * aspect));
+  } else if (h > 960) {
+    h = 960; // ultra-tall phones cap out
+  }
+  canvas.width = w;
+  canvas.height = h;
 })();
 const ctx = canvas.getContext('2d');
 const mainCtx = ctx;
@@ -2076,7 +2085,7 @@ function update() {
   // Storm creeps upward on its own; climbing fast pushes it back down (via the camera-shift below).
   // Stalling lets it catch up — adds real time pressure on top of "don't fall".
   const stormDiff = difficultyAt(cameraY);
-  const stormSpeed = 0.5 + stormDiff * 1.9 + lateDifficultyAt(cameraY) * 1.0;
+  const stormSpeed = 0.35 + stormDiff * 1.5 + lateDifficultyAt(cameraY) * 0.7;
   stormY -= stormSpeed;
 
   const stormGap = stormY - ball.y;
