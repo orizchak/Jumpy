@@ -3,29 +3,29 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a2b4a">
 <title>Jumpy</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
   body {
     background: #1a2b4a;
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 100vh;
+    height: 100dvh;
     font-family: 'Segoe UI', Tahoma, sans-serif;
     overflow: hidden;
     touch-action: none;
   }
   #wrap { position: relative; }
-  canvas {
-    border: 6px solid #2c3e50;
-    border-radius: 14px;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
-    display: block;
-  }
+  canvas { display: block; }
   #hud {
     position: absolute;
-    top: 5px;
+    top: calc(5px + env(safe-area-inset-top, 0px));
     left: 16px;
     right: 16px;
     display: flex;
@@ -737,9 +737,29 @@ window.addEventListener('error', function(e) {
 try {
 
 const canvas = document.getElementById('game');
+// The world's logical height adapts to the screen's aspect ratio (once, at load),
+// so tall phones get a genuinely taller playfield instead of letterbox bands
+(function fitLogicalHeight() {
+  const vw = Math.max(300, window.innerWidth);
+  const vh = Math.max(480, window.innerHeight);
+  const aspectH = Math.round(400 * vh / vw);
+  canvas.height = Math.max(700, Math.min(960, aspectH));
+})();
 const ctx = canvas.getContext('2d');
 const mainCtx = ctx;
 const W = canvas.width, H = canvas.height;
+
+// Scale the whole game (canvas + HUD overlays together) to fill the viewport
+const wrapEl = document.getElementById('wrap');
+function fitWrapToScreen() {
+  wrapEl.style.width = W + 'px';
+  wrapEl.style.height = H + 'px';
+  const s = Math.min(window.innerWidth / W, window.innerHeight / H);
+  wrapEl.style.transform = 'scale(' + s + ')';
+  wrapEl.style.transformOrigin = '50% 50%';
+}
+fitWrapToScreen();
+window.addEventListener('resize', fitWrapToScreen);
 const scoreEl = document.getElementById('score');
 const bestEl = document.getElementById('best');
 const overlay = document.getElementById('overlay');
