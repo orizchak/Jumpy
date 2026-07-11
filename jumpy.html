@@ -883,9 +883,9 @@ let goalPausedAt = 0;
 
 // --- Bot racers: three AI opponents climbing the same board against you ---
 const BOT_CONFIG = [
-  { name: 'Jumpinho',    emoji: '🇧🇷', color: '#2ecc71', steer: 4.3, errPx: 27, reactFrames: 21, blunder: 0.028 },
-  { name: 'Sir Offside', emoji: '🇺🇸', color: '#4aa3ff', steer: 4.5, errPx: 19, reactFrames: 16, blunder: 0.020 },
-  { name: 'El Nutmeg',   emoji: '🇲🇽', color: '#ff6b6b', steer: 4.0, errPx: 35, reactFrames: 27, blunder: 0.038 }
+  { name: 'Jumpinho',    emoji: '🇧🇷', color: '#2ecc71', steer: 4.5, errPx: 22, reactFrames: 17, blunder: 0.020 },
+  { name: 'Sir Offside', emoji: '🇺🇸', color: '#4aa3ff', steer: 4.7, errPx: 15, reactFrames: 13, blunder: 0.014 },
+  { name: 'El Nutmeg',   emoji: '🇲🇽', color: '#ff6b6b', steer: 4.2, errPx: 28, reactFrames: 22, blunder: 0.028 }
 ];
 let bots = [];
 let recentScroll = 0; // decaying measure of how fast the camera is climbing
@@ -897,9 +897,9 @@ let raceDifficulty = 'normal';
 
 // Bot skill presets per race difficulty (multipliers over each bot's base config)
 const DIFF_PRESETS = {
-  easy:   { steer: 0.93, err: 1.30, react: 1.30, blunder: 1.50, ahead: 0.62, rubber: 0   },
-  normal: { steer: 1.00, err: 1.00, react: 1.00, blunder: 1.00, ahead: 0.78, rubber: 0.6 },
-  hard:   { steer: 1.08, err: 0.70, react: 0.72, blunder: 0.60, ahead: 0.95, rubber: 1   }
+  easy:   { steer: 0.88, err: 1.55, react: 1.55, blunder: 2.00, ahead: 0.62, rubber: 0    },
+  normal: { steer: 1.00, err: 1.00, react: 1.00, blunder: 1.00, ahead: 0.92, rubber: 0.85 },
+  hard:   { steer: 1.10, err: 0.65, react: 0.68, blunder: 0.55, ahead: 1.06, rubber: 1.15 }
 };
 
 // Rubber-banding: bots trailing the player push harder, bots leading ease off,
@@ -908,7 +908,7 @@ function rubberBandFactor(b) {
   const strength = DIFF_PRESETS[raceDifficulty].rubber;
   if (!strength || gameMode !== 'race') return 1;
   const gap = score - Math.max(0, b.bestClimb + b.flagPoints); // positive = bot is behind
-  if (gap > 0) return 1 + Math.min(0.28, gap / 1100) * strength;
+  if (gap > 0) return 1 + Math.min(0.38, gap / 880) * strength;
   return 1 - Math.min(0.22, -gap / 1400) * strength;
 }
 let raceTarget = 1000; // climb score to win the race; increases each time you win
@@ -944,11 +944,12 @@ function initBots() {
   });
 }
 
+const BOT_FALL_PENALTY = 40;
 function botLoseLife(b) {
   // endless lives for everyone — a genuine misjump costs POINTS
   b.falls++;
-  b.flagPoints -= RACE_FALL_PENALTY;
-  addPopup(b.name + ' -' + RACE_FALL_PENALTY, W / 2, 90, b.color);
+  b.flagPoints -= BOT_FALL_PENALTY;
+  addPopup(b.name + ' -' + BOT_FALL_PENALTY, W / 2, 90, b.color);
   // revive on a lower-area platform (behind the player) with a grace period —
   // but always safely above the storm line to avoid instant re-capture
   let spots = platforms.filter(function(p) { return p.y > H * 0.55 && p.y < H * 0.88 && p.y < stormY - 130; });
@@ -959,7 +960,7 @@ function botLoseLife(b) {
   b.x = spot.x + spot.w / 2;
   b.y = spot.y - 13;
   b.vy = BOUNCE_VELOCITY;
-  b.grace = 90;
+  b.grace = 70;
   b.reactT = 0; // reassess immediately from the new position
   b.targetPlatform = null;
 }
@@ -1019,7 +1020,7 @@ function updateBots() {
     }
 
     // rubber-band applies gently to on-screen speed too (clamped so physics stay sane)
-    const effSteer = b.steer * Math.max(0.92, Math.min(1.12, rubberBandFactor(b)));
+    const effSteer = b.steer * Math.max(0.92, Math.min(1.14, rubberBandFactor(b)));
 
     // --- Smart target selection ---
     // Estimate frames for the bot to rise dh pixels after a bounce (v0 = |BOUNCE_VELOCITY|)
@@ -1066,7 +1067,9 @@ function updateBots() {
           pick = candidates[Math.floor(Math.random() * candidates.length)]; // blunder: suboptimal choice
         }
         b.targetPlatform = pick.p;
-        b.curErr = randRange(-b.errPx, b.errPx) * (stormNear ? 0.5 : 1); // focus under pressure
+        // aim error, clamped so the bot never targets past the platform's edge
+        const maxErr = Math.max(4, pick.p.w / 2 - 4);
+        b.curErr = Math.max(-maxErr, Math.min(maxErr, randRange(-b.errPx, b.errPx))) * (stormNear ? 0.5 : 1);
         b.targetX = pick.center + b.curErr;
       } else {
         b.targetPlatform = null;
@@ -1094,7 +1097,7 @@ function updateBots() {
     if (b.vy > 0) {
       for (const p of platforms) {
         if (
-          b.x + 7 > p.x && b.x - 7 < p.x + p.w &&
+          b.x + 9 > p.x && b.x - 9 < p.x + p.w &&
           b.y + 11 > p.y && b.y + 11 < p.y + PLATFORM_H + 10
         ) {
           b.vy = BOUNCE_VELOCITY;
@@ -1506,7 +1509,7 @@ function heightPointsFromPx(px) {
 let scorePenalty = 0; // accumulated race fall penalties (keeps the height floor honest)
 
 function difficultyAt(heightClimbed) {
-  return clamp01(heightClimbed / 4500);
+  return clamp01(heightClimbed / 3800);
 }
 
 // A gentle second difficulty slope that keeps the very high altitudes
@@ -1631,29 +1634,29 @@ function randomUnlockedFlagIndex(h) {
 function spawnPlatform(y, diff, climbed) {
   diff = diff || 0;
   climbed = climbed || 0;
-  const w = Math.max(38, PLATFORM_W - diff * 24);
+  const w = Math.max(33, PLATFORM_W - diff * 24 - lateDifficultyAt(climbed) * 9);
   const x = randRange(10, W - w - 10);
-  const movingChance = 0.2 + diff * 0.35 + lateDifficultyAt(climbed) * 0.15;
+  const movingChance = 0.2 + diff * 0.42 + lateDifficultyAt(climbed) * 0.2;
   const moving = Math.random() < movingChance && y < H - 200;
   platforms.push({
     x, y, w,
     moving,
     dir: Math.random() < 0.5 ? 1 : -1,
-    speed: randRange(1 + diff * 1.2, 2 + diff * 2.2) + lateDifficultyAt(climbed) * 1.0
+    speed: randRange(1 + diff * 1.3, 2 + diff * 2.4) + lateDifficultyAt(climbed) * 1.3
   });
   const roll = Math.random();
-  if (roll < 0.50) {
+  if (roll < 0.42) {
     flags.push({
       x: x + w/2, y: y - 32, collected: false, bob: Math.random()*Math.PI*2,
       countryIdx: randomUnlockedFlagIndex(climbed)
     });
-  } else if (roll < 0.72) {
+  } else if (roll < 0.58) {
     candies.push({
       x: x + w/2, y: y - 32, collected: false, bob: Math.random()*Math.PI*2,
       color: CANDY_COLORS[Math.floor(Math.random()*CANDY_COLORS.length)],
       twist: randRange(-0.3, 0.3)
     });
-  } else if (roll < 0.80) {
+  } else if (roll < 0.64) {
     gifts.push({ x: x + w/2, y: y - 32, collected: false, bob: Math.random()*Math.PI*2 });
   }
 }
@@ -2073,7 +2076,7 @@ function update() {
   // Storm creeps upward on its own; climbing fast pushes it back down (via the camera-shift below).
   // Stalling lets it catch up — adds real time pressure on top of "don't fall".
   const stormDiff = difficultyAt(cameraY);
-  const stormSpeed = 0.35 + stormDiff * 1.5 + lateDifficultyAt(cameraY) * 0.7;
+  const stormSpeed = 0.5 + stormDiff * 1.9 + lateDifficultyAt(cameraY) * 1.0;
   stormY -= stormSpeed;
 
   const stormGap = stormY - ball.y;
@@ -2300,14 +2303,14 @@ function update() {
     // vertical gap must stay comfortably below that. Instead of dumping recycled
     // platforms into a fixed band (which clumps them and can leave unjumpable voids),
     // chain each one a bounded distance above the current highest platform.
-    const MAX_SAFE_GAP = 140;
+    const MAX_SAFE_GAP = 160;
     for (const p of platforms) {
       if (p.y > H) {
         let topY = Infinity;
         for (const q of platforms) {
           if (q !== p && q.y < topY) topY = q.y;
         }
-        const gap = randRange(58, Math.min(MAX_SAFE_GAP, 98 + diff * 40));
+        const gap = randRange(62, Math.min(MAX_SAFE_GAP, 96 + diff * 48 + lateDifficultyAt(cameraY) * 14));
         p.y = (topY === Infinity) ? -gap : topY - gap;
         p.w = Math.max(38, PLATFORM_W - diff * 24);
         p.x = randRange(10, W - p.w - 10);
