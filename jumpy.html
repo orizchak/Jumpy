@@ -738,6 +738,7 @@ try {
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
+const mainCtx = ctx;
 const W = canvas.width, H = canvas.height;
 const scoreEl = document.getElementById('score');
 const bestEl = document.getElementById('best');
@@ -2463,7 +2464,8 @@ function initSkyStars() {
   }
 }
 
-function drawFlag(x, y, w, h, flag) {
+function drawFlag(x, y, w, h, flag, targetCtx) {
+  const ctx = targetCtx || mainCtx;
   ctx.save();
   ctx.beginPath();
   ctx.rect(x, y, w, h);
@@ -2620,23 +2622,38 @@ function drawShootingStar(t) {
 
 // Distant mountain silhouettes: two ridge layers with a slow horizontal
 // parallax drift as you climb, tinted to match the current sky phase
+// Ridge heights precomputed into lookup tables — per frame it's just an
+// indexed path fill with a scroll offset (no trig on the hot path)
+const MTN_STEP = 12;
+const MTN_LAYERS = [
+  { base: H * 0.80, amp: 26, freq: 0.012, alpha: 0.16, speed: 0.5, table: null },
+  { base: H * 0.86, amp: 38, freq: 0.008, alpha: 0.22, speed: 1.0, table: null }
+];
+(function buildMountainTables() {
+  for (const L of MTN_LAYERS) {
+    const span = 8192; // px of precomputed ridge; drift wraps around it
+    const n = Math.ceil(span / MTN_STEP);
+    L.table = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const wx = i * MTN_STEP;
+      L.table[i] = L.base
+        - Math.abs(Math.sin(wx * L.freq)) * L.amp
+        - Math.sin(wx * L.freq * 2.7 + 1.3) * L.amp * 0.35;
+    }
+    L.span = span;
+  }
+})();
 function drawMountains(t) {
   const drift = cameraY * 0.03;
-  const layers = [
-    { base: H * 0.80, amp: 26, freq: 0.012, alpha: 0.16, speed: 0.5 },
-    { base: H * 0.86, amp: 38, freq: 0.008, alpha: 0.22, speed: 1.0 }
-  ];
   const shade = t < 0.5 ? '43,68,102' : '10,14,30';
-  for (const L of layers) {
+  for (const L of MTN_LAYERS) {
     ctx.fillStyle = 'rgba(' + shade + ',' + L.alpha + ')';
     ctx.beginPath();
     ctx.moveTo(0, H);
-    for (let x = 0; x <= W; x += 8) {
-      const wx = x + drift * L.speed;
-      const y = L.base
-        - Math.abs(Math.sin(wx * L.freq)) * L.amp
-        - Math.sin(wx * L.freq * 2.7 + 1.3) * L.amp * 0.35;
-      ctx.lineTo(x, y);
+    const off = (drift * L.speed) % L.span;
+    for (let x = 0; x <= W; x += MTN_STEP) {
+      const idx = Math.floor(((x + off) % L.span) / MTN_STEP);
+      ctx.lineTo(x, L.table[idx]);
     }
     ctx.lineTo(W, H);
     ctx.closePath();
@@ -2653,14 +2670,20 @@ function drawSunMoon(t) {
   const sunA = clamp01(1 - t * 1.8);
   if (sunA > 0.02) {
     ctx.globalAlpha = sunA;
-    const sg = ctx.createRadialGradient(cx, cy, 2, cx, cy, 26);
-    sg.addColorStop(0, 'rgba(255,252,220,1)');
-    sg.addColorStop(0.5, 'rgba(255,225,120,0.9)');
-    sg.addColorStop(1, 'rgba(255,215,90,0)');
-    ctx.fillStyle = sg;
+    ctx.save();
+    ctx.translate(cx, cy);
+    if (!drawSunMoon.glow) {
+      const g = ctx.createRadialGradient(0, 0, 2, 0, 0, 26);
+      g.addColorStop(0, 'rgba(255,252,220,1)');
+      g.addColorStop(0.5, 'rgba(255,225,120,0.9)');
+      g.addColorStop(1, 'rgba(255,215,90,0)');
+      drawSunMoon.glow = g;
+    }
+    ctx.fillStyle = drawSunMoon.glow;
     ctx.beginPath();
-    ctx.arc(cx, cy, 26, 0, Math.PI*2);
+    ctx.arc(0, 0, 26, 0, Math.PI*2);
     ctx.fill();
+    ctx.restore();
     ctx.fillStyle = '#fff4c2';
     ctx.beginPath();
     ctx.arc(cx, cy, 13, 0, Math.PI*2);
@@ -2717,14 +2740,20 @@ function drawFloodlightPylon(x, leansRight) {
   ctx.restore();
 }
 
+let skyGradCache = { key: -1, grad: null };
 function drawBackground(diff) {
   const t = diff;
-  const sky = skyColorsAt(cameraY);
-  const grad = ctx.createLinearGradient(0, 0, 0, H);
-  grad.addColorStop(0, sky.top);
-  grad.addColorStop(0.55, sky.mid);
-  grad.addColorStop(1, sky.bot);
-  ctx.fillStyle = grad;
+  // gradient rebuilt only when the sky has visibly shifted (mobile perf)
+  const key = Math.round(cameraY / 40);
+  if (skyGradCache.key !== key) {
+    const sky = skyColorsAt(cameraY);
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, sky.top);
+    grad.addColorStop(0.55, sky.mid);
+    grad.addColorStop(1, sky.bot);
+    skyGradCache = { key: key, grad: grad };
+  }
+  ctx.fillStyle = skyGradCache.grad;
   ctx.fillRect(0, 0, W, H);
 
   drawSunMoon(t);
@@ -2738,27 +2767,27 @@ function drawBackground(diff) {
   if (t > 0.1) {
     ctx.save();
     ctx.globalAlpha = clamp01((t - 0.1) / 0.6) * 0.35;
-    const beam1 = ctx.createLinearGradient(0, 0, W*0.4, H*0.7);
-    beam1.addColorStop(0, 'rgba(255,250,220,0.9)');
-    beam1.addColorStop(1, 'rgba(255,250,220,0)');
-    ctx.fillStyle = beam1;
-    ctx.beginPath();
-    ctx.moveTo(-10, -10);
-    ctx.lineTo(W*0.55, -10);
-    ctx.lineTo(W*0.1, H*0.75);
-    ctx.closePath();
-    ctx.fill();
-
-    const beam2 = ctx.createLinearGradient(W, 0, W*0.6, H*0.7);
-    beam2.addColorStop(0, 'rgba(255,250,220,0.9)');
-    beam2.addColorStop(1, 'rgba(255,250,220,0)');
-    ctx.fillStyle = beam2;
-    ctx.beginPath();
-    ctx.moveTo(W+10, -10);
-    ctx.lineTo(W*0.45, -10);
-    ctx.lineTo(W*0.9, H*0.75);
-    ctx.closePath();
-    ctx.fill();
+    if (!drawBackground.beamSprite) {
+      const bs = document.createElement('canvas');
+      bs.width = W; bs.height = H;
+      const b2x = bs.getContext('2d');
+      const b1 = b2x.createLinearGradient(0, 0, W*0.4, H*0.7);
+      b1.addColorStop(0, 'rgba(255,250,220,0.9)');
+      b1.addColorStop(1, 'rgba(255,250,220,0)');
+      b2x.fillStyle = b1;
+      b2x.beginPath();
+      b2x.moveTo(-10, -10); b2x.lineTo(W*0.55, -10); b2x.lineTo(W*0.1, H*0.75);
+      b2x.closePath(); b2x.fill();
+      const b2 = b2x.createLinearGradient(W, 0, W*0.6, H*0.7);
+      b2.addColorStop(0, 'rgba(255,250,220,0.9)');
+      b2.addColorStop(1, 'rgba(255,250,220,0)');
+      b2x.fillStyle = b2;
+      b2x.beginPath();
+      b2x.moveTo(W+10, -10); b2x.lineTo(W*0.45, -10); b2x.lineTo(W*0.9, H*0.75);
+      b2x.closePath(); b2x.fill();
+      drawBackground.beamSprite = bs;
+    }
+    ctx.drawImage(drawBackground.beamSprite, 0, 0);
     ctx.restore();
   }
 
@@ -2788,25 +2817,51 @@ function drawBackground(diff) {
   ctx.globalAlpha = 1;
   drawCrowd(cameraY * 0.22, 70);
 
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  if (!drawBackground.cloudSprite) {
+    const cw = 200, ch = 120, ref = 100; // reference cloud width
+    const cs = document.createElement('canvas');
+    cs.width = cw; cs.height = ch;
+    const c2 = cs.getContext('2d');
+    c2.fillStyle = 'rgba(255,255,255,0.85)';
+    c2.beginPath();
+    c2.ellipse(cw/2, ch/2, ref*0.5, ref*0.28, 0, 0, Math.PI*2);
+    c2.ellipse(cw/2 - ref*0.3, ch/2 + 6, ref*0.32, 0.2*ref, 0, 0, Math.PI*2);
+    c2.ellipse(cw/2 + ref*0.3, ch/2 + 6, ref*0.32, 0.2*ref, 0, 0, Math.PI*2);
+    c2.fill();
+    drawBackground.cloudSprite = cs;
+  }
+  const cs = drawBackground.cloudSprite;
   for (const c of clouds) {
     const cy = ((c.y + cameraY * c.speed * 0.3) % (H + 120)) - 60;
-    ctx.beginPath();
-    ctx.ellipse(c.x, cy, c.w*0.5, c.w*0.28, 0, 0, Math.PI*2);
-    ctx.ellipse(c.x - c.w*0.3, cy + 6, c.w*0.32, 0.2*c.w, 0, 0, Math.PI*2);
-    ctx.ellipse(c.x + c.w*0.3, cy + 6, c.w*0.32, 0.2*c.w, 0, 0, Math.PI*2);
-    ctx.fill();
+    const s = c.w / 100;
+    ctx.drawImage(cs, c.x - 100*s, cy - 60*s, 200*s, 120*s);
   }
 }
 
+const HILL_STEP = 20, HILL_SPAN = 4400; // one full wave period is 880px
+const hillTables = {};
+function hillTable(amplitude, baseline) {
+  const key = amplitude + '_' + baseline;
+  if (!hillTables[key]) {
+    const n = Math.ceil(HILL_SPAN / HILL_STEP);
+    const t = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const wx = i * HILL_STEP;
+      t[i] = H - baseline + Math.sin(wx / 70) * amplitude * 0.5
+             + Math.sin(wx * 0.5 / 70) * amplitude * 0.3;
+    }
+    hillTables[key] = t;
+  }
+  return hillTables[key];
+}
 function drawHillLayer(scrollY, amplitude, baseline) {
-  const wave = 70;
+  const table = hillTable(amplitude, baseline);
+  const off = scrollY % HILL_SPAN;
   ctx.beginPath();
   ctx.moveTo(0, H);
-  for (let x = 0; x <= W; x += 20) {
-    const y = H - baseline + Math.sin((x + scrollY) / wave) * amplitude * 0.5
-              + Math.sin((x + scrollY) * 0.5 / wave) * amplitude * 0.3;
-    ctx.lineTo(x, y);
+  for (let x = 0; x <= W; x += HILL_STEP) {
+    const idx = Math.floor(((x + off + HILL_SPAN) % HILL_SPAN) / HILL_STEP);
+    ctx.lineTo(x, table[idx]);
   }
   ctx.lineTo(W, H);
   ctx.closePath();
@@ -2825,15 +2880,24 @@ function initCrowd() {
     });
   }
 }
+let crowdStrip = null;
 function drawCrowd(scrollY, baseline) {
   if (!crowdDots) return;
-  const rowY = H - baseline - 3;
-  for (const d of crowdDots) {
-    const x = ((d.x + scrollY) % (W + 20)) - 10;
-    ctx.fillStyle = d.color;
-    ctx.globalAlpha = 0.5;
-    ctx.fillRect(x, rowY + d.jitter, 2.2, 2.2);
+  const stripW = W + 20;
+  if (!crowdStrip) {
+    crowdStrip = document.createElement('canvas');
+    crowdStrip.width = stripW; crowdStrip.height = 12;
+    const c2 = crowdStrip.getContext('2d');
+    for (const d of crowdDots) {
+      c2.fillStyle = d.color;
+      c2.fillRect(d.x % stripW, 5 + d.jitter, 2.2, 2.2);
+    }
   }
+  const rowY = H - baseline - 8;
+  const off = scrollY % stripW;
+  ctx.globalAlpha = 0.5;
+  ctx.drawImage(crowdStrip, -off, rowY);
+  ctx.drawImage(crowdStrip, stripW - off, rowY);
   ctx.globalAlpha = 1;
 }
 
@@ -2916,9 +2980,6 @@ function drawFlagItem(f) {
   ctx.save();
   ctx.translate(f.x, bobY);
   ctx.rotate(flutter);
-  ctx.shadowColor = 'rgba(0,0,0,0.3)';
-  ctx.shadowBlur = 5;
-
   // pole
   ctx.strokeStyle = '#8d6e4a';
   ctx.lineWidth = 2;
@@ -2931,11 +2992,22 @@ function drawFlagItem(f) {
   ctx.arc(-fw*0.5, -fh*0.6, 1.8, 0, Math.PI*2);
   ctx.fill();
 
-  // flag
-  ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-  ctx.lineWidth = 1;
-  drawFlag(-fw*0.5, -fh*0.6, fw, fh, nation);
-  ctx.strokeRect(-fw*0.5, -fh*0.6, fw, fh);
+  // flag: each nation is rendered once at 2x and blitted thereafter
+  if (!drawFlagItem.sprites) drawFlagItem.sprites = {};
+  let spr = drawFlagItem.sprites[f.countryIdx];
+  if (!spr) {
+    spr = document.createElement('canvas');
+    spr.width = Math.ceil(fw * 2) + 2; spr.height = Math.ceil(fh * 2) + 2;
+    const s2 = spr.getContext('2d');
+    s2.scale(2, 2);
+    s2.translate(0.5, 0.5);
+    s2.strokeStyle = 'rgba(0,0,0,0.2)';
+    s2.lineWidth = 1;
+    drawFlag(0, 0, fw, fh, nation, s2);
+    s2.strokeRect(0, 0, fw, fh);
+    drawFlagItem.sprites[f.countryIdx] = spr;
+  }
+  ctx.drawImage(spr, -fw*0.5, -fh*0.6, fw + 1, fh + 1);
   ctx.restore();
 }
 
@@ -2944,8 +3016,6 @@ function drawCandyItem(c) {
   if (!isFiniteNum(c.x) || !isFiniteNum(c.y)) return;
   const bobY = c.y + Math.sin(c.bob) * 4;
   ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.25)';
-  ctx.shadowBlur = 6;
   drawCandy(ctx, c.x, bobY, CANDY_R, c.color, c.twist);
   ctx.restore();
 }
@@ -2957,8 +3027,6 @@ function drawGiftItem(g) {
   const r = GIFT_R;
   ctx.save();
   ctx.translate(g.x, bobY);
-  ctx.shadowColor = 'rgba(64,196,255,0.9)';
-  ctx.shadowBlur = 10;
 
   // box
   ctx.fillStyle = '#40c4ff';
@@ -2989,20 +3057,23 @@ function drawPlatform(p) {
   if (p.y < -30 || p.y > H + 30) return;
   const dip = p.dip && p.dip > 0.3 ? p.dip : 0;
   if (dip) { ctx.save(); ctx.translate(0, dip); }
-  ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.25)';
-  ctx.shadowBlur = 6;
-  ctx.shadowOffsetY = 3;
-  const grad = ctx.createLinearGradient(p.x, p.y, p.x, p.y + PLATFORM_H);
-  if (p.moving) {
-    grad.addColorStop(0, '#ffe066');
-    grad.addColorStop(1, '#f7931e');
-  } else {
-    grad.addColorStop(0, '#7ee08a');
-    grad.addColorStop(1, '#2fa84f');
+  // build the two platform gradients once, in platform-local space
+  if (!drawPlatform.gMoving) {
+    let g = ctx.createLinearGradient(0, 0, 0, PLATFORM_H);
+    g.addColorStop(0, '#ffe066'); g.addColorStop(1, '#f7931e');
+    drawPlatform.gMoving = g;
+    g = ctx.createLinearGradient(0, 0, 0, PLATFORM_H);
+    g.addColorStop(0, '#7ee08a'); g.addColorStop(1, '#2fa84f');
+    drawPlatform.gStatic = g;
   }
-  ctx.fillStyle = grad;
-  roundRectPath(ctx, p.x, p.y, p.w, PLATFORM_H, 7);
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  // cheap soft shadow: a dark offset shape instead of GPU-heavy shadowBlur
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  roundRectPath(ctx, 2, 4, p.w, PLATFORM_H, 7);
+  ctx.fill();
+  ctx.fillStyle = p.moving ? drawPlatform.gMoving : drawPlatform.gStatic;
+  roundRectPath(ctx, 0, 0, p.w, PLATFORM_H, 7);
   ctx.fill();
   ctx.restore();
   // subtle top-light sheen for a rounded, lit look
@@ -3208,13 +3279,20 @@ function drawBallTrail() {
   ctx.globalAlpha = 1;
 }
 
+let vignetteCanvas = null;
 function drawVignette() {
-  // subtle darkened corners for depth and focus
-  const vg = ctx.createRadialGradient(W/2, H/2, H*0.42, W/2, H/2, H*0.75);
-  vg.addColorStop(0, 'rgba(0,0,0,0)');
-  vg.addColorStop(1, 'rgba(10,15,35,0.22)');
-  ctx.fillStyle = vg;
-  ctx.fillRect(0, 0, W, H);
+  // static effect: rasterized once, blitted every frame (mobile perf)
+  if (!vignetteCanvas) {
+    vignetteCanvas = document.createElement('canvas');
+    vignetteCanvas.width = W; vignetteCanvas.height = H;
+    const vctx = vignetteCanvas.getContext('2d');
+    const vg = vctx.createRadialGradient(W/2, H/2, H*0.42, W/2, H/2, H*0.75);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(10,15,35,0.22)');
+    vctx.fillStyle = vg;
+    vctx.fillRect(0, 0, W, H);
+  }
+  ctx.drawImage(vignetteCanvas, 0, 0);
 }
 
 // Draws the full Trionda ball character (skin + face) centered at the current
@@ -3222,10 +3300,16 @@ function drawVignette() {
 function drawTriondaCharacter(r, facing, spin) {
   // World Cup 2026 "Trionda"-style skin: white base with three curved
   // triangular panels in the host nations' red, blue, and green, plus gold accents
-  const g = ctx.createRadialGradient(-r*0.35, -r*0.4, 2, 0, 0, r*1.3);
-  g.addColorStop(0, '#ffffff');
-  g.addColorStop(0.75, '#f4f4f4');
-  g.addColorStop(1, '#dcdcdc');
+  if (!drawTriondaCharacter.gcache) drawTriondaCharacter.gcache = {};
+  const gkey = Math.round(r * 2);
+  let g = drawTriondaCharacter.gcache[gkey];
+  if (!g) {
+    g = ctx.createRadialGradient(-r*0.35, -r*0.4, 2, 0, 0, r*1.3);
+    g.addColorStop(0, '#ffffff');
+    g.addColorStop(0.75, '#f4f4f4');
+    g.addColorStop(1, '#dcdcdc');
+    drawTriondaCharacter.gcache[gkey] = g;
+  }
   ctx.beginPath();
   ctx.fillStyle = g;
   ctx.arc(0, 0, r, 0, Math.PI*2);
