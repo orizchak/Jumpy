@@ -48,6 +48,34 @@
     border-radius: 10px;
     font-variant-numeric: tabular-nums;
   }
+  #distCounter {
+    width: fit-content;
+    margin-top: 4px;
+    font-size: 11.5px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: rgba(255,255,255,0.85);
+    background: rgba(0,0,0,0.25);
+    padding: 2px 9px;
+    border-radius: 9px;
+    font-variant-numeric: tabular-nums;
+  }
+  #muteBtn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: none;
+    z-index: 40;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.35);
+    background: rgba(0,0,0,0.3);
+    font-size: 19px;
+    cursor: pointer;
+  }
+  #muteBtn:active { transform: scale(0.92); }
+  #muteBtn.show { display: block; }
   #hudLeft {
     position: absolute;
     top: 44px;
@@ -174,8 +202,8 @@
     display: none;
     align-items: center;
     justify-content: center;
-    background: rgba(10,15,30,0.52);
-    backdrop-filter: blur(1px);
+    background: rgba(10,15,30,0.68);
+    backdrop-filter: blur(1.5px);
     border-radius: 9px;
     z-index: 8;
   }
@@ -244,6 +272,9 @@
     text-align: left;
   }
   .winsTable .wtHead {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
     font-size: 10.5px;
     font-weight: 800;
     letter-spacing: 1px;
@@ -255,11 +286,14 @@
   .winsTable .wtRow {
     display: flex;
     justify-content: space-between;
-    gap: 22px;
+    gap: 8px;
     padding: 1.5px 0;
     opacity: 0.92;
   }
   .winsTable .wtRow.you { color: #ffe066; font-weight: 800; }
+  .winsTable .nameCol { flex: 1; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .winsTable .valCol { width: 46px; text-align: right; flex: none; font-variant-numeric: tabular-nums; }
+  .winsTable .wtHead .valCol { font-size: 9px; color: rgba(255,255,255,0.75); }
   .winsTable .dot {
     display: inline-block;
     width: 7px; height: 7px;
@@ -273,7 +307,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: radial-gradient(circle at 50% 30%, rgba(28,46,84,0.5), rgba(10,15,30,0.64));
+    background: radial-gradient(circle at 50% 30%, rgba(28,46,84,0.68), rgba(10,15,30,0.82));
     color: white;
     text-align: center;
     border-radius: 8px;
@@ -675,6 +709,7 @@
     </div>
   </div>
   <div id="hudLeft">
+    <div id="distCounter">📏 0m</div>
     <div id="statusRow">
       <div id="shieldTag">🛡</div>
       <div id="multTag">2×</div>
@@ -687,6 +722,7 @@
   <button id="pauseBtn" title="Pause">⏸</button>
   <div id="raceGoal"></div>
   <div id="countdown"></div>
+  <button id="muteBtn" title="Sound on/off">🔊</button>
   <div id="pauseOverlay">
     <div id="pauseCard">
       <h2>PAUSED</h2>
@@ -709,18 +745,13 @@
       <div class="cardTitle">🚩 FLAG COMBOS</div>
       <div class="cardRow"><span class="comboNum">3×</span> same flag → <b>+1 LIFE</b></div>
       <div class="cardRow"><span class="comboNum">5×</span> same flag → <b>🚀 MEGA BOOST</b></div>
-      <div class="cardRow"><span class="comboNum">7×</span> same flag → <b>🥅 GOLDEN GOAL kick</b></div>
+      <div class="cardRow"><span class="comboNum">10×</span> same flag → <b>🥅 GOLDEN GOAL kick</b></div>
       <div class="cardRow" style="border-top:1px solid rgba(255,255,255,0.14); margin-top:4px; padding-top:5px;"><span class="comboNum">⚡</span> 3 pickups in 3s → <b>HAT-TRICK, 2× score</b></div>
     </div>
     <div id="menuStats"></div>
     <div id="modeSelect">
       <button class="modeChip selected" data-mode="classic">🏃 CLASSIC<span>endless climb</span></button>
-      <button class="modeChip" data-mode="race">🏁 RACE<span id="raceChipGoal">first to 1000</span></button>
-    </div>
-    <div id="diffSelect">
-      <button class="diffChip" data-diff="easy">EASY</button>
-      <button class="diffChip selected" data-diff="normal">NORMAL</button>
-      <button class="diffChip" data-diff="hard">HARD</button>
+      <button class="modeChip" data-mode="race">🏁 RACE<span id="raceChipGoal">first to 1000m</span></button>
     </div>
     <button id="startBtn">KICK OFF</button>
   </div>
@@ -863,6 +894,7 @@ function togglePause() {
     }
     pauseStatsEl.innerHTML = rows;
     pauseOverlayEl.classList.add('show');
+    document.getElementById('muteBtn').classList.add('show');
     keys.left = false; keys.right = false;
     playWhistle(false);
   } else {
@@ -871,6 +903,7 @@ function togglePause() {
     // if paused during a GOLDEN GOAL, shift its anchor too so the span isn't counted twice
     if (goalGame.active) goalPausedAt += Date.now() - pausedAt;
     pauseOverlayEl.classList.remove('show');
+    if (running) document.getElementById('muteBtn').classList.remove('show');
     playWhistle(false);
   }
 }
@@ -884,9 +917,10 @@ let flagsCollectedCount = 0;
 let flagCountsByCountry = {}; // countryIdx -> count; every 3 of the same country = +1 life
 let reviveGraceTimer = 0;     // brief invulnerable window after a revive
 let ballTrail = [];           // recent ball positions for the motion trail
-let boostTimer = 0;           // frames of mega-boost flight remaining
+let boostTimer = 0;           // safety-cap frames of mega-boost flight remaining
+let boostDistLeft = 0;        // px of climb this boost still grants (100m per boost)
 let boostsQueued = 0;         // GOLDEN GOAL prize: chained mega boosts
-let goalPendingCount = 0;     // GOLDEN GOALs earned (7 same flags each)
+let goalPendingCount = 0;     // GOLDEN GOALs earned (10 same flags each)
 let goalGame = { active: false };
 let goalPausedAt = 0;
 
@@ -896,181 +930,147 @@ const BOT_CONFIG = [
   { name: 'Sir Offside', emoji: '🇺🇸', color: '#4aa3ff', steer: 4.7, errPx: 15, reactFrames: 13, blunder: 0.014 },
   { name: 'El Nutmeg',   emoji: '🇲🇽', color: '#ff6b6b', steer: 4.2, errPx: 28, reactFrames: 22, blunder: 0.028 }
 ];
+// Bot skill presets per race difficulty (multipliers over each bot's base config)
+const DIFF_PRESETS = {
+  easy:   { steer: 0.88, err: 1.55, react: 1.55, blunder: 2.00, ahead: 1.05, rubber: 0    },
+  normal: { steer: 1.00, err: 1.00, react: 1.00, blunder: 1.00, ahead: 1.55, rubber: 0.85 },
+  hard:   { steer: 1.10, err: 0.65, react: 0.68, blunder: 0.55, ahead: 1.80, rubber: 1.15 }
+};
 let bots = [];
 let recentScroll = 0; // decaying measure of how fast the camera is climbing
-let botScrollDebt = 0; // camera scroll gained during YOUR boosts — never credited to bots
 
 // --- Game modes: CLASSIC endless survival, or RACE first-to-target against the bots ---
 let gameMode = 'classic';
-let raceDifficulty = 'normal';
+let raceDifficulty = 'hard'; // rivals always race at full strength
 
-// Bot skill presets per race difficulty (multipliers over each bot's base config)
-const DIFF_PRESETS = {
-  easy:   { steer: 0.88, err: 1.55, react: 1.55, blunder: 2.00, ahead: 0.62, rubber: 0    },
-  normal: { steer: 1.00, err: 1.00, react: 1.00, blunder: 1.00, ahead: 0.92, rubber: 0.85 },
-  hard:   { steer: 1.10, err: 0.65, react: 0.68, blunder: 0.55, ahead: 1.06, rubber: 1.15 }
-};
 
-// Rubber-banding: bots trailing the player push harder, bots leading ease off,
-// keeping races tight. Strength scales with difficulty (none on easy).
-function rubberBandFactor(b) {
-  const strength = DIFF_PRESETS[raceDifficulty].rubber;
-  if (!strength || gameMode !== 'race') return 1;
-  const gap = score - Math.max(0, b.bestClimb + b.flagPoints); // positive = bot is behind
-  if (gap > 0) return 1 + Math.min(0.38, gap / 880) * strength;
-  return 1 - Math.min(0.22, -gap / 1400) * strength;
-}
 let raceTarget = 1000; // climb score to win the race; increases each time you win
 let raceWins = {};     // session-wide win tally per racer, shown after every race
 let raceOver = false;
+let raceFinishCount = 0; // how many rivals have crossed the line before you
 let raceCountdown = 0;       // frames of pre-race countdown remaining
 let prevLeaderName = '';     // for overtake notifications
 let leadChangeCooldown = 0;  // throttle for lead-change popups
 let finalStretchShown = false;
 
+// The race is decided by DISTANCE (meters climbed), not points
+function playerRaceDistM() {
+  return Math.floor((cameraY + Math.max(0, (H - 100) - ball.y)) / 10);
+}
+
+// Rubber-banding: trailing bots push harder, leaders ease off (scaled by difficulty)
+function rubberBandFactor(b) {
+  const strength = DIFF_PRESETS[raceDifficulty].rubber;
+  if (!strength || gameMode !== 'race') return 1;
+  const gap = playerRaceDistM() - b.bestClimb; // meters; positive = bot is behind
+  if (gap > 0) return 1 + Math.min(0.38, gap / 880) * strength;
+  return 1 - Math.min(0.22, -gap / 1400) * strength;
+}
+
 function initBots() {
-  // Bots are rivals for RACE mode only — classic is a pure solo climb
+  raceFinishCount = 0;
   if (gameMode !== 'race') { bots = []; return; }
   const P = DIFF_PRESETS[raceDifficulty];
   bots = BOT_CONFIG.map(function(cfg, i) {
     return {
-      name: cfg.name, emoji: cfg.emoji, color: cfg.color,
+      id: i, name: cfg.name, emoji: cfg.emoji, color: cfg.color,
       steer: cfg.steer * P.steer,
       errPx: cfg.errPx * P.err,
       reactFrames: Math.round(cfg.reactFrames * P.react),
       blunder: cfg.blunder * P.blunder,
-      x: W * (0.25 + i * 0.25), y: H - 100,
-      vx: 0, vy: BOUNCE_VELOCITY,
-      targetX: W / 2, reactT: Math.floor(Math.random() * 20),
-      bestClimb: 0, falls: 0,
-      lives: 3, grace: 0, eliminated: false,
-      flagCounts: {}, id: i,
-      targetPlatform: null, curErr: 0,
-      ahead: false, virtualLead: 0, flagPoints: 0,
-      penaltyT: 0, pendingBoosts: 0,
-      aheadRate: P.ahead * (cfg.steer / 4.4) // climb speed while out of view above
+      aheadRate: P.ahead * (cfg.steer / 4.4), // px/frame climb while out of view above
+      x: 60 + i * (W - 120) / 2, y: H - 100, vx: 0, vy: BOUNCE_VELOCITY,
+      targetX: W / 2, targetPlatform: null, reactT: 0, curErr: 0,
+      grace: 40, spin: 0, falls: 0, stuckT: 0, lastBest: 0,
+      ahead: false, virtualLead: 0, behind: false, behindAlt: 0, bestClimb: 0, altOffset: 0,
+      flagCounts: {}, flagPoints: 0, penaltyT: 0,
+      finished: false, finishTime: 0, eliminated: false, onScreen: true
     };
   });
 }
 
-const BOT_FALL_PENALTY = 40;
-function botLoseLife(b) {
-  // endless lives for everyone — a genuine misjump costs POINTS
-  b.falls++;
-  b.flagPoints -= BOT_FALL_PENALTY;
-  addPopup(b.name + ' -' + BOT_FALL_PENALTY, W / 2, 90, b.color);
-  // revive on a lower-area platform (behind the player) with a grace period —
-  // but always safely above the storm line to avoid instant re-capture
-  let spots = platforms.filter(function(p) { return p.y > H * 0.55 && p.y < H * 0.88 && p.y < stormY - 130; });
-  if (!spots.length) spots = platforms.filter(function(p) { return p.y < stormY - 130 && p.y > 40; });
-  const spot = spots.length
-    ? spots[Math.floor(Math.random() * spots.length)]
-    : platforms.reduce(function(a, c) { return a.y < c.y ? a : c; });
-  b.x = spot.x + spot.w / 2;
-  b.y = spot.y - 13;
-  b.vy = BOUNCE_VELOCITY;
-  b.grace = 70;
-  b.reactT = 0; // reassess immediately from the new position
+
+function botGoBehind(b) {
+  // the bot drops out of the bottom: it keeps racing BELOW the view at its own
+  // pace and only re-enters when it genuinely catches back up. Altitude-continuous.
+  b.behind = true;
+  b.behindAlt = cameraY + (H - Math.min(b.y, H + 30)) - 100;
   b.targetPlatform = null;
 }
 
 function updateBots() {
+  if (gameMode !== 'race' || !bots.length || raceOver) return;
+  // your rocket is YOUR moment: rivals gain nothing while you boost
+  const gainsFrozen = boostTimer > 0;
   for (const b of bots) {
-    if (b.eliminated) continue;
-
-    // AHEAD mode: the bot has out-climbed the visible window and keeps racing
-    // upward on its own, independent of the player's camera
-    // your rocket is YOUR moment: rivals' point gains freeze while you boost
-    const gainsFrozen = boostTimer > 0;
-    if (b.ahead) {
-      if (b.penaltyT > 0) {
-        b.penaltyT--;
-        if (b.penaltyT === 0) {
-          const scores = Math.random() < (0.7 - b.blunder * 5);
-          if (scores) {
-            addPopup('⚽ ' + b.name + ' SCORES! 🚀', W / 2, 120, '#ffd54f');
-            playCrowdRoar(0.9, 0.06);
-            b.virtualLead += 520; // triple-boost worth of lead
-          } else {
-            addPopup('🧤 ' + b.name + ' — SAVED!', W / 2, 120, '#cfd8e3');
-          }
+    // --- penalty kick resolution (works in view and ahead) ---
+    if (b.penaltyT > 0 && !gainsFrozen && !b.finished) {
+      b.penaltyT--;
+      if (b.penaltyT === 0) {
+        if (Math.random() < 0.7 - b.blunder * 5) {
+          addPopup('⚽ ' + b.name + ' GOOOAL! +900m 🚀', W / 2, 110, '#ffd54f');
+          playCrowdRoar(0.9, 0.06);
+          if (b.behind) b.behindAlt += 9000;  // rockets it back toward the pack
+          else b.altOffset -= 9000;           // triple mega boost, same 900m prize as yours
+        } else {
+          addPopup('🧤 ' + b.name + ' — SAVED!', W / 2, 110, '#cfd8e3');
         }
       }
-      if (!gainsFrozen) b.virtualLead += b.aheadRate * rubberBandFactor(b);
-      // occasional virtual stumble so leads aren't a flawless escalator
-      if (Math.random() < 0.008) {
-        b.virtualLead = Math.max(0, b.virtualLead - randRange(80, 200));
+    }
+
+    // --- behind-the-view mode: racing below the screen, catching up at its own pace ---
+    if (b.behind) {
+      if (!gainsFrozen && !b.finished) {
+        b.behindAlt += b.aheadRate * rubberBandFactor(b);
+        b.bestClimb = Math.max(b.bestClimb, Math.floor(Math.max(0, b.behindAlt - b.altOffset) / 10));
       }
-      if (!gainsFrozen) b.bestClimb = Math.max(b.bestClimb, heightPointsFromPx(Math.max(0, cameraY - botScrollDebt + (H + 14) + b.virtualLead - 100)));
+      // caught up to the bottom of the view: physically re-enter on a low platform
+      if (b.behindAlt >= cameraY - 90) {
+        let spots = platforms.filter(function(p) { return p.y > H * 0.6 && p.y < H * 0.88; });
+        const spot = spots.length
+          ? spots[Math.floor(Math.random() * spots.length)]
+          : platforms.reduce(function(a, c) { return a.y > c.y ? a : c; });
+        b.behind = false;
+        b.x = spot.x + spot.w / 2;
+        b.y = spot.y - 13;
+        b.vy = BOUNCE_VELOCITY;
+        b.grace = 40;
+        b.reactT = 0;
+        b.altOffset += (cameraY + (H - b.y) - 100) - b.behindAlt; // altitude-neutral handover
+      }
+      continue;
+    }
+
+    // --- ahead-of-view mode: abstract climbing at aheadRate ---
+    if (b.ahead) {
+      if (!gainsFrozen && !b.finished) {
+        b.virtualLead += b.aheadRate * rubberBandFactor(b);
+        b.bestClimb = Math.max(b.bestClimb, Math.floor(Math.max(0, cameraY + (H + 14) + b.virtualLead - 100 - b.altOffset) / 10));
+      }
       continue;
     }
 
     if (b.grace > 0) b.grace--;
 
-    // bot penalty kick: brief suspense, then a skill-based verdict
-    if (b.penaltyT > 0) {
-      b.penaltyT--;
-      if (b.penaltyT === 0) {
-        const scores = Math.random() < (0.7 - b.blunder * 5);
-        if (scores) {
-          addPopup('⚽ ' + b.name + ' SCORES! 🚀', W / 2, 120, '#ffd54f');
-          playCrowdRoar(0.9, 0.06);
-          b.pendingBoosts = 3; // same triple mega boost prize
-        } else {
-          addPopup('🧤 ' + b.name + ' — SAVED!', W / 2, 120, '#cfd8e3');
-        }
-      }
-    }
-    // chained penalty-prize launches: fire on each descent
-    if (b.pendingBoosts > 0 && b.vy > 0) {
-      b.vy = -20;
-      b.grace = Math.max(b.grace, 45);
-      b.pendingBoosts--;
-    }
-
-    // rubber-band applies gently to on-screen speed too (clamped so physics stay sane)
     const effSteer = b.steer * Math.max(0.92, Math.min(1.14, rubberBandFactor(b)));
 
-    // --- Smart target selection ---
-    // Estimate frames for the bot to rise dh pixels after a bounce (v0 = |BOUNCE_VELOCITY|)
-    function timeToRise(dh) {
-      const v0 = -BOUNCE_VELOCITY;
-      const disc = v0 * v0 - 2 * GRAVITY * dh;
-      if (disc <= 0) return null; // above max jump height
-      return (v0 - Math.sqrt(disc)) / GRAVITY;
-    }
-
-    const stormNear = (stormY - b.y) < 220; // panic mode: prioritize pure height
-
+    // --- target selection: pick a reachable platform above, human-imperfect ---
     b.reactT--;
-    if (b.reactT <= 0) {
-      b.reactT = (stormNear ? Math.ceil(b.reactFrames * 0.5) : b.reactFrames) + Math.floor(Math.random() * 8);
+    if (b.reactT <= 0 || !b.targetPlatform || b.targetPlatform.y > b.y + 10) {
+      b.reactT = b.reactFrames + Math.floor(Math.random() * 6);
+      const stormNear = (stormY - b.y) < 240;
       const candidates = [];
       for (const p of platforms) {
         const dh = b.y - p.y;
-        if (dh < 10 || dh > 190) continue; // below, or beyond max jump height
-        const t = timeToRise(dh);
-        if (t === null) continue;
-        // predict where a moving platform will be when the bot arrives
-        let px = p.x;
-        if (p.moving) {
-          px = p.x + p.dir * p.speed * t;
-          if (px < 5) px = 5;
-          if (px + p.w > W - 5) px = W - 5 - p.w;
-        }
-        const center = px + p.w / 2;
+        if (dh < 12 || dh > 185) continue;
+        const center = p.x + p.w / 2;
         const dx = Math.abs(center - b.x);
-        // reachability: can the bot cover dx horizontally within the airtime (plus slack)?
-        if (dx > effSteer * (t + 16)) continue;
-        let s = dh * (stormNear ? 2.2 : 1.0)         // height gain (heavily weighted in a storm panic)
-              + p.w * 0.6                            // wider = safer landing
-              - (p.moving ? 16 : 0)                  // moving platforms are riskier
-              - dx * 0.10                            // closer is easier
-              - Math.abs(center - W / 2) * 0.04;     // mild preference away from walls
-        candidates.push({ p: p, center: center, score: s });
+        const t = 40 + dh * 0.35;
+        if (dx > effSteer * (t + 16)) continue; // honest reachability
+        candidates.push({ p: p, center: center, score: dh + p.w * 0.4 - dx * 0.2 });
       }
       if (candidates.length) {
-        candidates.sort(function(c1, c2) { return c2.score - c1.score; });
+        candidates.sort(function(a, c) { return c.score - a.score; });
         let pick = candidates[0];
         if (Math.random() < b.blunder && candidates.length > 1) {
           pick = candidates[Math.floor(Math.random() * candidates.length)]; // blunder: suboptimal choice
@@ -1080,29 +1080,23 @@ function updateBots() {
         const maxErr = Math.max(4, pick.p.w / 2 - 4);
         b.curErr = Math.max(-maxErr, Math.min(maxErr, randRange(-b.errPx, b.errPx))) * (stormNear ? 0.5 : 1);
         b.targetX = pick.center + b.curErr;
-      } else {
-        b.targetPlatform = null;
       }
     }
-
-    // continuously track a moving target platform between decisions
+    // track moving targets continuously
     if (b.targetPlatform && b.targetPlatform.moving) {
       b.targetX = b.targetPlatform.x + b.targetPlatform.w / 2 + b.curErr;
     }
 
-    // steer toward target
+    // --- steering + physics ---
     if (b.x < b.targetX - 6) b.vx = effSteer;
     else if (b.x > b.targetX + 6) b.vx = -effSteer;
     else b.vx = 0;
-
     b.x += b.vx;
-    if (b.x < 10) b.x = 10;
-    if (b.x > W - 10) b.x = W - 10;
-
+    b.x = Math.max(10, Math.min(W - 10, b.x));
     b.vy += GRAVITY;
     b.y += b.vy;
 
-    // bounce on platforms (same rules as the player)
+    // land on platforms (forgiving ±9 like the player)
     if (b.vy > 0) {
       for (const p of platforms) {
         if (
@@ -1110,74 +1104,85 @@ function updateBots() {
           b.y + 11 > p.y && b.y + 11 < p.y + PLATFORM_H + 10
         ) {
           b.vy = BOUNCE_VELOCITY;
+          b.reactT = 0; // reassess from the bounce
           break;
         }
       }
     }
 
-    // ghost flag collection: bots tally flags for their own combos without
-    // taking them off the board (the player's pickups are never stolen)
-    for (const f of flags) {
-      if (gainsFrozen) break; // no ghost-flag points during your boost either
-      if (f.collected) continue;
-      if (!f.takenBy) f.takenBy = {};
-      if (f.takenBy[b.id]) continue;
-      const dx = b.x - f.x, dy2 = b.y - f.y;
-      if (Math.sqrt(dx*dx + dy2*dy2) < 11 + FLAG_R) {
-        f.takenBy[b.id] = true;
-        b.flagPoints += 10;
-        b.flagCounts[f.countryIdx] = (b.flagCounts[f.countryIdx] || 0) + 1;
-        const c = b.flagCounts[f.countryIdx];
-        if (c % 3 === 0 && b.lives < MAX_LIVES) {
-          b.lives++; // same 3-of-a-kind rule as the player
-        }
-        if (c % 5 === 0 && c % 7 !== 0) {
-          b.vy = -20; // same 5-of-a-kind mega boost
-          b.grace = Math.max(b.grace, 60);
-        }
-        if (c % 7 === 0 && b.penaltyT <= 0) {
-          // 10 same flags: the bot steps up for its own penalty kick
-          b.penaltyT = 85;
-          addPopup('🥅 ' + b.name + ' steps up…', W / 2, 120, b.color);
-          playWhistle(false);
+    // --- ghost flags: bots collect too (flags remain for YOU) ---
+    if (!gainsFrozen && !b.finished) {
+      for (const f of flags) {
+        if (f.collected) continue;
+        if (!f.takenBy) f.takenBy = {};
+        if (f.takenBy[b.id]) continue;
+        if (Math.abs(f.x - b.x) < 26 && Math.abs(f.y - b.y) < 30) {
+          f.takenBy[b.id] = true;
+          b.flagPoints += 10;
+          b.flagCounts[f.countryIdx] = (b.flagCounts[f.countryIdx] || 0) + 1;
+          const c = b.flagCounts[f.countryIdx];
+          if (c % 5 === 0 && c % 10 !== 0) {
+            // same 5-of-a-kind MEGA BOOST as yours: a real 300m
+            b.altOffset -= 3000;
+            b.vy = -20; // visual launch
+            b.grace = Math.max(b.grace, 60);
+            addPopup('🚀 ' + b.name + ' MEGA BOOST +300m!', W / 2, 110, b.color);
+            playAirHorn(false);
+          }
+          if (c % 10 === 0 && b.penaltyT <= 0) {
+            b.penaltyT = 85;
+            addPopup('🥅 ' + b.name + ' steps up…', W / 2, 110, b.color);
+            playWhistle(false);
+          }
         }
       }
     }
 
-    // out-climbed the view: switch to independent ahead-mode climbing
-    // (threshold sits past the edge so the boundary can't oscillate)
-    if (b.y < -28) {
-      b.ahead = true;
-      b.virtualLead = -14 - b.y;
-      b.y = -28;
+    // --- dropping out of the bottom: keep racing BEHIND the view ---
+    if (b.y > H + 30) {
+      if (recentScroll <= 40) {
+        // genuine misjump (not just the player racing away): a fall costs time
+        b.falls++;
+        addPopup('💨 ' + b.name, W / 2, 90, b.color);
+      }
+      botGoBehind(b);
+      continue;
+    }
+    if (b.grace <= 0 && b.y + 11 > stormY) {
+      b.falls++;
+      addPopup('🌩 ' + b.name, W / 2, 90, b.color);
+      botGoBehind(b);
       continue;
     }
 
-    // same death rules as the player: falling or the storm costs a life —
-    // but losing ground because the PLAYER is rushing isn't the bot's misjump:
-    // they respawn without losing a life (though they lose progress)
-    const pacedOut = recentScroll > 40;
-    if (b.y > H + 50 || (b.grace <= 0 && b.y + 11 > stormY)) {
-      if (pacedOut) {
-        let spots = platforms.filter(function(p) { return p.y > H * 0.55 && p.y < H * 0.88 && p.y < stormY - 130; });
-        if (!spots.length) spots = platforms.filter(function(p) { return p.y < stormY - 130 && p.y > 40; });
-        const spot = spots.length
-          ? spots[Math.floor(Math.random() * spots.length)]
-          : platforms.reduce(function(a, c) { return a.y < c.y ? a : c; });
-        b.x = spot.x + spot.w / 2;
-        b.y = spot.y - 13;
-        b.vy = BOUNCE_VELOCITY;
-        b.grace = Math.max(b.grace, 45);
-        b.reactT = 0;
-        b.targetPlatform = null;
-      } else {
-        botLoseLife(b);
+    // --- climb metric (meters), with the boost scroll-debt deducted ---
+    if (!gainsFrozen && !b.finished) {
+      b.bestClimb = Math.max(b.bestClimb, Math.floor(Math.max(0, cameraY + (H - b.y) - 100 - b.altOffset) / 10));
+    }
+
+    // --- anti-stall: a bot making no progress finds its rhythm with one big hop ---
+    // (escaping a static screen upward demands precision; sloppier bots can
+    //  wander the band for ages — this guarantees everyone keeps racing)
+    if (b.bestClimb > b.lastBest) {
+      b.lastBest = b.bestClimb;
+      b.stuckT = 0;
+    } else if (!gainsFrozen && b.grace <= 0 && !b.finished) {
+      b.stuckT++;
+      if (b.stuckT > 300) { // ~5s without gaining a meter
+        b.stuckT = 0;
+        b.vy = -20;
+        b.grace = Math.max(b.grace, 50);
       }
     }
 
-    if (!gainsFrozen) {
-      b.bestClimb = Math.max(b.bestClimb, heightPointsFromPx(Math.max(0, cameraY - botScrollDebt + (H - b.y) - 100)));
+    // --- passing above the view: switch to abstract ahead-mode (altitude-neutral) ---
+    if (b.y < -28) {
+      const oldRaw = cameraY + (H - b.y) - 100;
+      b.ahead = true;
+      b.virtualLead = -b.y;
+      b.altOffset += (cameraY + (H + 14) + b.virtualLead - 100) - oldRaw;
     }
+    b.spin += b.vx * 0.05;
   }
 }
 
@@ -1188,9 +1193,9 @@ function playerClimbScore() {
 function raceStandings() {
   // the race is decided by SCORE: height points + pickups (bots earn ghost-flag points)
   const entries = bots.map(function(b) {
-    return { name: b.name, emoji: b.emoji, color: b.color, climb: Math.max(0, b.bestClimb + b.flagPoints), you: false, falls: b.falls, out: false };
+    return { name: b.name, emoji: b.emoji, color: b.color, climb: b.bestClimb, you: false, falls: b.falls, out: false };
   });
-  entries.push({ name: 'YOU', emoji: '⚽', color: '#ffe066', climb: score, you: true, falls: playerFalls, out: false });
+  entries.push({ name: 'YOU', emoji: '⚽', color: '#ffe066', climb: playerRaceDistM(), you: true, falls: playerFalls, out: false });
   entries.sort(function(a, c) {
     if (c.climb !== a.climb) return c.climb - a.climb;
     return a.you ? -1 : (c.you ? 1 : 0); // ties (e.g. 0–0 at kickoff) favor the player
@@ -1238,7 +1243,7 @@ function renderRaceBoard() {
     const rank = i === 0 ? '🏆' : (i + 1) + '.';
     html += '<div class="raceRow' + (e.you ? ' you' : '') + '">' +
       rank + ' <span class="dot" style="background:' + e.color + '"></span>' +
-      e.name + ' ' + e.climb + status + '</div>';
+      e.name + ' ' + e.climb + 'm' + status + '</div>';
   }
   document.getElementById('raceBoard').innerHTML = html;
 }
@@ -1293,6 +1298,9 @@ function registerPickup() {
   }
 }
 const matchClockEl = document.getElementById('matchClock');
+const distCounterEl = document.getElementById('distCounter');
+let hudDistM = 0;
+let lastMilestone = 0;
 const livesDisplayEl = document.getElementById('livesDisplay');
 const flagCounterEl = document.getElementById('flagCounter');
 function renderLives() {
@@ -1341,6 +1349,8 @@ const shieldTag = document.getElementById('shieldTag');
 
 // --- Sound engine (procedural, no audio files needed) ---
 let audioCtx = null;
+let soundMuted = false;
+try { soundMuted = localStorage.getItem('jumpyMuted') === '1'; } catch (e) {}
 function ensureAudio() {
   try {
     if (!audioCtx) {
@@ -1354,7 +1364,7 @@ function ensureAudio() {
 
 // Core tone generator with a gentle lowpass filter for a softer, less harsh timbre.
 function beep(opts) {
-  if (!audioCtx) return;
+  if (!audioCtx || soundMuted) return;
   try {
     const now = audioCtx.currentTime;
     const osc = audioCtx.createOscillator();
@@ -1397,6 +1407,7 @@ function playJumpSound() {
 // Realistic football "kick" sound: a short burst of lowpassed noise (the leather
 // impact) layered over a quick low-frequency punch (the thump you feel)
 function playKickThud() {
+  if (soundMuted) return;
   if (!audioCtx) return;
   try {
     const now = audioCtx.currentTime;
@@ -1478,6 +1489,7 @@ function playChampionFanfare() {
 
 // Crowd roar: filtered white noise that swells and fades, like a stadium erupting
 function playCrowdRoar(duration, volume) {
+  if (soundMuted) return;
   if (!audioCtx) return;
   try {
     const now = audioCtx.currentTime;
@@ -1654,18 +1666,18 @@ function spawnPlatform(y, diff, climbed) {
     speed: randRange(1 + diff * 1.3, 2 + diff * 2.4) + lateDifficultyAt(climbed) * 1.3
   });
   const roll = Math.random();
-  if (roll < 0.42) {
+  if (roll < 0.52) {
     flags.push({
       x: x + w/2, y: y - 32, collected: false, bob: Math.random()*Math.PI*2,
       countryIdx: randomUnlockedFlagIndex(climbed)
     });
-  } else if (roll < 0.58) {
+  } else if (roll < 0.66) {
     candies.push({
       x: x + w/2, y: y - 32, collected: false, bob: Math.random()*Math.PI*2,
       color: CANDY_COLORS[Math.floor(Math.random()*CANDY_COLORS.length)],
       twist: randRange(-0.3, 0.3)
     });
-  } else if (roll < 0.64) {
+  } else if (roll < 0.71) {
     gifts.push({ x: x + w/2, y: y - 32, collected: false, bob: Math.random()*Math.PI*2 });
   }
 }
@@ -1684,15 +1696,18 @@ function resetGame() {
   raceOver = false;
   scorePenalty = 0;
   playerFalls = 0;
+  hudDistM = 0;
+  lastMilestone = 0;
+  distCounterEl.textContent = '📏 0m';
   playerEliminated = false;
-  botScrollDebt = 0;
   shuffleFlagOrder();
   goalPendingCount = 0;
   goalGame = { active: false };
   boostsQueued = 0;
+  boostDistLeft = 0;
   raceCountdown = gameMode === 'race' ? 230 : 0; // goal message, then 3…2…1…GO!
   document.getElementById('raceGoal').style.display = gameMode === 'race' ? 'block' : 'none';
-  document.getElementById('raceGoal').textContent = '🎯 FIRST TO ' + raceTarget;
+  document.getElementById('raceGoal').textContent = '🎯 FIRST TO ' + raceTarget + 'm';
   prevLeaderName = '';
   leadChangeCooldown = 0;
   finalStretchShown = false;
@@ -1738,7 +1753,7 @@ function resetGame() {
 }
 
 function addPopup(text, x, y, color) {
-  popups.push({ text, x, y, life: 45, color: color || '#ffcc33' });
+  popups.push({ text, x, y, life: 105, color: color || '#ffcc33' });
 }
 
 function addSparkle(x, y) {
@@ -1778,6 +1793,7 @@ function addConfetti(x, y, count) {
 function startGoalGame() {
   goalGame = {
     active: true, phase: 'aim', t: 0,
+    lockT: 180, // 3s: big 3-2-1 countdown — taps can't kick yet
     aimX: 0, keeperX: 0, kickAim: 0, shotT: 0,
     result: '', resT: 0, netRipple: 0
   };
@@ -1788,7 +1804,7 @@ function startGoalGame() {
 }
 
 function kickGoalBall() {
-  if (!goalGame.active || goalGame.phase !== 'aim') return;
+  if (!goalGame.active || goalGame.phase !== 'aim' || goalGame.lockT > 0) return;
   goalGame.kickAim = goalGame.aimX;
   goalGame.keeperAtKick = goalGame.keeperX;
   goalGame.phase = 'shot';
@@ -1801,9 +1817,10 @@ function finishGoalGame() {
   matchStartTime += Date.now() - goalPausedAt; // bonus stage doesn't eat the clock
   if (goalGame.result === 'goal') {
     boostsQueued = 2;             // two more launches queued...
-    boostTimer = 120;             // ...and the first fires right now
+    boostTimer = 450;             // ...and the first fires right now
+    boostDistLeft = 3000;         // 3 boosts x 300m = 900m prize
     ball.vy = -24;
-    reviveGraceTimer = Math.max(reviveGraceTimer, 150);
+    reviveGraceTimer = Math.max(reviveGraceTimer, 280);
     addConfetti(ball.x, ball.y, 50);
     showReward('🚀 TRIPLE MEGA BOOST!', '#ffd54f', '255,213,79', '⚽', 'golden goal reward');
     playAirHorn(true);
@@ -1812,7 +1829,8 @@ function finishGoalGame() {
 
 function updateGoalGame() {
   const g = goalGame;
-  g.t++;
+  if (g.lockT > 0) { g.lockT--; }
+  else g.t++;
   if (g.phase === 'aim') {
     g.aimX = Math.sin(g.t * 0.052);                 // sweeping aim
     g.keeperX = Math.sin(g.t * 0.033 + 1.7) * 0.55; // patrolling keeper
@@ -1984,7 +2002,28 @@ function drawGoalGame() {
   if (g.phase === 'aim') {
     ctx.font = '800 17px sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,' + (0.55 + 0.45 * Math.abs(Math.sin(g.t * 0.09))) + ')';
-    ctx.fillText('TAP TO SHOOT!', cx, H - 70);
+    if (goalGame.lockT > 0) {
+      ctx.fillText('GET READY…', cx, H - 70);
+      // big 3-2-1 in the middle, pulsing as each second lands
+      const n = Math.ceil(goalGame.lockT / 60);
+      const frac = (goalGame.lockT % 60) / 60;
+      const scale = 1 + frac * 0.55;
+      ctx.save();
+      ctx.translate(cx, H * 0.5);
+      ctx.scale(scale, scale);
+      ctx.globalAlpha = 0.35 + frac * 0.65;
+      ctx.font = '900 84px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = 8;
+      ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+      ctx.strokeText(String(n), 0, 0);
+      ctx.fillStyle = '#ffd54f';
+      ctx.fillText(String(n), 0, 0);
+      ctx.restore();
+    } else {
+      ctx.fillText('TAP TO SHOOT!', cx, H - 70);
+    }
   }
   if (g.phase === 'result') {
     const popIn = Math.min(1, g.resT / 8);
@@ -2016,7 +2055,7 @@ function update() {
     const inGoalPhase = raceCountdown > 165;
     let label;
     if (inGoalPhase) {
-      label = '🎯 FIRST TO ' + raceTarget;
+      label = '🎯 FIRST TO ' + raceTarget + 'm';
     } else {
       const step = Math.ceil(raceCountdown / 55); // 3, 2, 1, then 0 = GO
       label = step >= 1 ? String(step) : 'GO!';
@@ -2051,9 +2090,10 @@ function update() {
 
   if (boostTimer <= 0 && boostsQueued > 0) {
     boostsQueued--;
-    boostTimer = 120;
+    boostTimer = 450;      // safety cap
+    boostDistLeft = 3000;  // each boost carries you exactly 300m
     ball.vy = -24;
-    reviveGraceTimer = Math.max(reviveGraceTimer, 150);
+    reviveGraceTimer = Math.max(reviveGraceTimer, 280);
     addConfetti(ball.x, ball.y, 25);
     addPopup('MEGA BOOST! (' + (2 - boostsQueued + 1) + '/3)', ball.x, ball.y - 40, '#ffd54f');
     playAirHorn(true);
@@ -2061,6 +2101,10 @@ function update() {
   if (boostTimer > 0) {
     boostTimer--;
     ball.vy = Math.min(ball.vy, -14); // sustained rocket flight
+    boostDistLeft -= Math.max(0, -ball.vy);
+    // hand over to momentum early: the coast after cut-off covers the remainder,
+    // so boost + coast together deliver the promised 100m
+    if (boostDistLeft <= (ball.vy * ball.vy) / (2 * GRAVITY)) boostTimer = 0;
     if (boostTimer % 3 === 0) addSparkle(ball.x, ball.y + ball.r);
   } else {
     ball.vy += GRAVITY;
@@ -2142,12 +2186,12 @@ function update() {
         playAirHorn(false);
       }
       // Collecting 5 flags of the same country launches a MEGA BOOST
-      if (flagCountsByCountry[f.countryIdx] % 5 === 0 && flagCountsByCountry[f.countryIdx] % 7 !== 0) {
+      if (flagCountsByCountry[f.countryIdx] % 5 === 0 && flagCountsByCountry[f.countryIdx] % 10 !== 0) {
         const nation = FLAG_NATIONS[f.countryIdx] || FLAG_NATIONS[0];
         triggerMegaBoost(nation, flagCountsByCountry[f.countryIdx]);
       }
-      // Collecting 7 flags of the same country earns a GOLDEN GOAL penalty kick!
-      if (flagCountsByCountry[f.countryIdx] % 7 === 0) {
+      // Collecting 10 flags of the same country earns a GOLDEN GOAL penalty kick!
+      if (flagCountsByCountry[f.countryIdx] % 10 === 0) {
         const nation = FLAG_NATIONS[f.countryIdx] || FLAG_NATIONS[0];
         goalPendingCount++;
         addConfetti(f.x, f.y, 25);
@@ -2211,29 +2255,40 @@ function update() {
     return;
   }
 
-  // RACE mode: first to reach the target wins — or be the last one standing
+  // RACE mode: straight racing — first to the target distance wins
   if (gameMode === 'race' && !raceOver) {
-    const playerScore = score;
+    const playerScore = playerRaceDistM();
     // final stretch: someone is closing on the finish line
     if (!finalStretchShown) {
-      const bestBot = bots.reduce(function(m, b) { return b.eliminated ? m : Math.max(m, b.bestClimb + b.flagPoints); }, 0);
+      const bestBot = bots.reduce(function(m, b) { return Math.max(m, b.bestClimb); }, 0);
       if (Math.max(playerScore, bestBot) >= raceTarget - 150) {
         finalStretchShown = true;
-        showReward('🏁 FINAL STRETCH!', '#ffd54f', '255,213,79', '🏁', 'first to ' + raceTarget + ' wins');
+        showReward('🏁 FINAL STRETCH!', '#ffd54f', '255,213,79', '🏁', 'first to ' + raceTarget + 'm wins');
         playCrowdRoar(1.2, 0.1);
+      }
+    }
+    // rivals crossing the line log their time and keep the race alive —
+    // the race only ends when YOU finish, so every finisher's stats make the table
+    for (const b of bots) {
+      if (!b.finished && b.bestClimb >= raceTarget) {
+        b.finished = true;
+        b.finishTime = (Date.now() - matchStartTime) / 1000;
+        raceFinishCount++;
+        b.finishOrder = raceFinishCount;
+        b.bestClimb = raceTarget;
+        addPopup('🏁 ' + b.name + ' finishes! ' + formatMatchTime(b.finishTime * 1000), W / 2, 110, b.color);
+        playWhistle(false);
       }
     }
     if (playerScore >= raceTarget) {
       raceOver = true;
       running = false;
-      showRaceResult(true, 'YOU', 'You reached ' + raceTarget + ' first!');
-      return;
-    }
-    const winnerBot = bots.find(function(b) { return Math.max(0, b.bestClimb + b.flagPoints) >= raceTarget; });
-    if (winnerBot) {
-      raceOver = true;
-      running = false;
-      showRaceResult(false, winnerBot.name, winnerBot.name + ' reached ' + raceTarget + ' first');
+      if (raceFinishCount === 0) {
+        showRaceResult(true, 'YOU', 'You reached ' + raceTarget + 'm first!');
+      } else {
+        const first = bots.find(function(b) { return b.finishOrder === 1; });
+        showRaceResult(false, first.name, first.name + ' reached ' + raceTarget + 'm first — you finished #' + (raceFinishCount + 1));
+      }
       return;
     }
   }
@@ -2279,19 +2334,22 @@ function update() {
         // the camera catching up eats into the bot's off-screen lead
         b.virtualLead -= dy;
         if (b.virtualLead <= 0) {
+          // altitude-neutral handover: absorb the overshoot so a big scroll
+          // frame can never gift the bot free distance at the boundary
+          const oldRaw = cameraY + (H + 14) + b.virtualLead - 100;
           b.ahead = false;
           b.virtualLead = 0;
           b.y = -13;
-          b.vy = 2.5; // descend into view — prevents boundary flicker
+          b.vy = 2.5; // descend into view
           b.reactT = 0;
           b.targetPlatform = null;
+          b.altOffset += (cameraY + (H - b.y) - 100) - oldRaw;
         }
-      } else {
+      } else if (!b.behind) {
         b.y += dy;
       }
     }
     recentScroll += dy;
-    if (boostTimer > 0 && gameMode === 'race') botScrollDebt += dy;
     for (const pu of popups) pu.y += dy;
     if (!celebratedNewBest && score > bestAtRunStart && bestAtRunStart > 0) {
       celebratedNewBest = true;
@@ -2400,20 +2458,35 @@ function update() {
 let playerFalls = 0;
 let playerEliminated = false; // legacy flag, always false under endless-lives race rules
 const RACE_FALL_PENALTY = 60;
+const LIFE_LOSS_PENALTY = 50; // classic: every lost life costs this, fall or storm alike
 
 function handleDeath(reason) {
   if (gameMode === 'race') {
-    // race rules: endless lives — falling or the storm costs POINTS instead
+    // race rules: endless lives — a fall costs TIME plus the unified points penalty
     playerFalls++;
-    scorePenalty += RACE_FALL_PENALTY;
-    score = Math.max(0, score - RACE_FALL_PENALTY);
-    addPopup('-' + RACE_FALL_PENALTY + ' pts', ball.x, ball.y - 30, '#ff6b6b');
+    if (score > 0) {
+      const penalty = Math.min(score, LIFE_LOSS_PENALTY);
+      score -= penalty;
+      scorePenalty += penalty;
+      scoreEl.textContent = score;
+      addPopup('💔 -' + penalty + ' pts', W / 2, 110, '#ff6b6b');
+    } else {
+      addPopup('💨 back in!', W / 2, 110, '#ff6b6b');
+    }
     revivePlayer();
     return;
   }
   playerFalls++;
   lives--;
   renderLives();
+  // unified penalty: losing a life costs the same points no matter the cause
+  if (score > 0) {
+    const penalty = Math.min(score, LIFE_LOSS_PENALTY);
+    score -= penalty;
+    scorePenalty += penalty;
+    addPopup('💔 -' + penalty + ' pts', W / 2, 110, '#ff6b6b');
+    scoreEl.textContent = score;
+  }
   if (lives > 0) {
     revivePlayer();
   } else {
@@ -2424,8 +2497,9 @@ function handleDeath(reason) {
 }
 
 function triggerMegaBoost(nation, count) {
-  boostTimer = 120; // ~2s of super-flight
-  reviveGraceTimer = Math.max(reviveGraceTimer, 150); // immune to the storm during and just after
+  boostTimer = 450;     // safety cap
+  boostDistLeft = 3000; // a mega boost carries you exactly 300m
+  reviveGraceTimer = Math.max(reviveGraceTimer, 280); // immune to the storm during and just after
   ball.vy = -24; // rocket launch
   addConfetti(ball.x, ball.y, 40);
   addPopup('MEGA BOOST! (5x ' + nation.name + ')', ball.x, ball.y - 40, '#ffd54f');
@@ -2452,7 +2526,6 @@ function revivePlayer() {
   reviveGraceTimer = 90; // ~1.5s of storm immunity
   ballTrail = [];
   addConfetti(ball.x, ball.y, 12);
-  addPopup('BACK IN THE GAME!', ball.x, ball.y - 30, '#ffe066');
 }
 
 function lerp(a, b, t) { return a + (b - a) * t; }
@@ -3158,6 +3231,61 @@ function polygonPath(ctx, cx, cy, radius, sides, rotation) {
 
 // Slim vertical progress rail on the right edge: every racer's dot climbs
 // toward the trophy at the top as they approach the race target
+// World-anchored distance markers: a milestone line every 1000m (all modes)
+// and a checkered FINISH barrier at the race target distance
+function drawDistanceLines() {
+  const baseline = H - 100; // world height h px sits at screenY = baseline - (h - cameraY)
+  // --- 1000m milestones ---
+  const kFrom = Math.max(1, Math.floor((cameraY - 140) / 5000));
+  for (let k = kFrom; k <= kFrom + 2; k++) {
+    const py = baseline - (k * 5000 - cameraY);
+    if (py < -30 || py > H + 30) continue;
+    ctx.save();
+    ctx.setLineDash([10, 8]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, py);
+    ctx.lineTo(W, py);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font = '800 11px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    roundRectPath(ctx, 6, py - 19, 64, 16, 8);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('⛳ ' + (k * 500) + ' m', 12, py - 7);
+    ctx.restore();
+  }
+  // --- race finish barrier ---
+  if (gameMode !== 'race') return;
+  const fy = baseline - (raceTarget * 10 - cameraY);
+  if (fy < -60 || fy > H + 30) return;
+  ctx.save();
+  // checkered tape
+  const sq = 12;
+  for (let x = 0; x < W; x += sq) {
+    ctx.fillStyle = (Math.floor(x / sq) % 2 === 0) ? '#111111' : '#ffffff';
+    ctx.fillRect(x, fy - 6, sq, 6);
+    ctx.fillStyle = (Math.floor(x / sq) % 2 === 0) ? '#ffffff' : '#111111';
+    ctx.fillRect(x, fy, sq, 6);
+  }
+  // posts
+  ctx.fillStyle = '#e74c3c';
+  ctx.fillRect(2, fy - 34, 4, 34);
+  ctx.fillRect(W - 6, fy - 34, 4, 34);
+  // label
+  ctx.font = '900 15px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+  ctx.strokeText('🏁 FINISH — ' + raceTarget + 'm', W / 2, fy - 14);
+  ctx.fillStyle = '#ffd54f';
+  ctx.fillText('🏁 FINISH — ' + raceTarget + 'm', W / 2, fy - 14);
+  ctx.restore();
+}
+
 function drawRaceProgress() {
   if (gameMode !== 'race' || raceCountdown > 0) return;
   const x = W - 9;
@@ -3227,21 +3355,38 @@ function drawBotMarker(b, arrow, y) {
   ctx.font = '800 8.5px sans-serif';
   const nameY = arrow === '▲' ? 22 : -14;
   ctx.strokeText(b.name, 0, nameY);
-  ctx.fillText(b.name, 0, nameY);
+  ctx.fillText(b.name + ' · ' + b.bestClimb + 'm', 0, nameY);
+  ctx.restore();
+}
+
+function drawPlayerRaceTag() {
+  if (goalGame.active || raceOver || !running) return;
+  const label = playerRaceDistM() + 'm';
+  ctx.save();
+  ctx.font = '800 10px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+  ctx.strokeText(label, ball.x, ball.y + ball.r + 16);
+  ctx.fillStyle = '#ffe066';
+  ctx.fillText(label, ball.x, ball.y + ball.r + 16);
   ctx.restore();
 }
 
 function drawBots() {
   for (const b of bots) {
-    if (b.eliminated) continue;
-    // bots ahead of the view: colored arrow + name at the top edge
+    // rivals ahead of the view: colored arrow + name at the top edge
     if (b.ahead) {
-      drawBotMarker(b, '▲', 56 + b.id * 34); // fixed slot per bot — no shuffling
+      drawBotMarker(b, '▲', 52 + b.id * 30); // fixed slot per rival — no shuffling
+      continue;
+    }
+    // rivals racing below the view: ▼ marker at the bottom edge
+    if (b.behind) {
+      drawBotMarker(b, '▼', H - 205 + b.id * 26);
       continue;
     }
     if (!isFiniteNum(b.x) || !isFiniteNum(b.y)) continue;
     if (b.y < -32 || b.y > H + 20) continue;
-    if (b.y < -20 || b.y > H + 20) continue;
     const facing = b.vx < 0 ? -1 : 1;
     ctx.save();
     ctx.translate(b.x, b.y);
@@ -3280,7 +3425,7 @@ function drawBots() {
 
     // live rank above the head (🏆 for the leader)
     if (raceRanks[b.name]) {
-      const rl = rankLabel(raceRanks[b.name]);
+      const rl = rankLabel(raceRanks[b.name]) + ' · ' + b.bestClimb + 'm';
       ctx.font = rl === '🏆' ? '12px sans-serif' : '800 9px sans-serif';
       ctx.lineWidth = 3;
       ctx.strokeStyle = 'rgba(0,0,0,0.7)';
@@ -3562,10 +3707,13 @@ function drawConfetti() {
 
 function drawPopups() {
   for (const pu of popups) {
-    ctx.globalAlpha = Math.max(0, pu.life / 45);
-    ctx.fillStyle = pu.color;
-    ctx.font = 'bold 16px Segoe UI, sans-serif';
+    ctx.globalAlpha = Math.min(1, Math.max(0, pu.life / 45)); // hold, then fade out
+    ctx.font = '800 21px Segoe UI, sans-serif';
     ctx.textAlign = 'center';
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+    ctx.strokeText(pu.text, pu.x, pu.y);
+    ctx.fillStyle = pu.color;
     ctx.fillText(pu.text, pu.x, pu.y);
   }
   ctx.globalAlpha = 1;
@@ -3579,9 +3727,11 @@ function draw() {
   for (const c of candies) drawCandyItem(c);
   for (const g of gifts) drawGiftItem(g);
   drawParticles();
+  drawDistanceLines();
   drawStorm();
   drawBarrier();
   drawBots();
+  drawPlayerRaceTag();
   drawRaceProgress();
   drawBallTrail();
   drawBall();
@@ -3615,6 +3765,16 @@ function loop() {
     draw();
     renderRaceBoard();
     matchClockEl.textContent = formatMatchTime(Date.now() - matchStartTime);
+    hudDistM = Math.max(hudDistM, Math.floor((cameraY + Math.max(0, (H - 100) - ball.y)) / 10));
+    distCounterEl.textContent = '📏 ' + hudDistM + 'm';
+    // crossing a 500m barrier: celebrate!
+    const mile = Math.floor(hudDistM / 500);
+    if (mile > lastMilestone) {
+      lastMilestone = mile;
+      addConfetti(ball.x, ball.y - 30, 45);
+      showReward('⛳ ' + (mile * 500) + 'm!', '#7ce8ff', '124,232,255', '⛳', 'barrier crossed — keep climbing!');
+      playCrowdRoar(0.8, 0.07);
+    }
   } catch (err) {
     showRealError(err);
     return;
@@ -3623,6 +3783,7 @@ function loop() {
 }
 
 function startGame() {
+  document.getElementById('muteBtn').classList.remove('show');
   try {
     ensureAudio();
     if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
@@ -3636,26 +3797,49 @@ function startGame() {
 }
 
 function showRaceResult(playerWon, winnerName, reason) {
+  document.getElementById('muteBtn').classList.add('show');
   raceWins[winnerName] = (raceWins[winnerName] || 0) + 1;
   playWhistle(true);
   stormWarning.classList.remove('show');
-  const standings = raceStandings();
+  const playerElapsedSec = (Date.now() - matchStartTime) / 1000;
+  const playerFinished = playerRaceDistM() >= raceTarget;
+  // rank by true finish ORDER (bot pace-clocks pause during your boosts, so raw
+  // times aren't directly comparable to the wall clock); times shown per racer
+  const resultEntries = bots.map(function(b) {
+    return { name: b.name, color: b.color, you: false, pts: b.flagPoints,
+             order: b.finished ? b.finishOrder : null,
+             time: b.finished ? b.finishTime : null, climb: b.bestClimb };
+  });
+  resultEntries.push({ name: 'YOU', color: '#ffe066', you: true,
+                       order: playerFinished ? raceFinishCount + 1 : null,
+                       time: playerFinished ? playerElapsedSec : null, climb: playerRaceDistM() });
+  resultEntries.sort(function(a, c) {
+    if ((a.order !== null) !== (c.order !== null)) return a.order !== null ? -1 : 1; // finishers first
+    if (a.order !== null) return a.order - c.order;  // true crossing order
+    return c.climb - a.climb;                        // then furthest distance
+  });
   const medals = ['🥇', '🥈', '🥉'];
-  const rows = '<div class="winsTable"><div class="wtHead"><span>🏁 FINAL STANDINGS</span><span></span></div>' +
-    standings.map(function(e, i) {
+  const rows = '<div class="winsTable">' +
+    '<div class="wtHead"><span class="nameCol">🏁 STANDINGS</span>' +
+      '<span class="valCol">⏱ TIME</span><span class="valCol">📏 DIST</span><span class="valCol">⚽ PTS</span></div>' +
+    resultEntries.map(function(e, i) {
       const medal = medals[i] || (i + 1) + '.';
-      const scoreCol = e.out ? '☠ OUT' : String(e.climb);
-      return '<div class="wtRow' + (e.you ? ' you' : '') + '"' + (e.out ? ' style="opacity:0.55"' : '') + '>' +
-        '<span>' + medal + ' <span class="dot" style="background:' + e.color + '"></span> ' + e.name + '</span>' +
-        '<span>' + scoreCol + '</span></div>';
+      const tCol = e.time !== null ? formatMatchTime(e.time * 1000) : '—';
+      const dCol = e.climb + 'm';
+      const sCol = e.you ? String(score) : String(e.pts || 0);
+      return '<div class="wtRow' + (e.you ? ' you' : '') + '">' +
+        '<span class="nameCol">' + medal + ' <span class="dot" style="background:' + e.color + '"></span> ' + e.name + '</span>' +
+        '<span class="valCol">' + tCol + '</span>' +
+        '<span class="valCol">' + dCol + '</span>' +
+        '<span class="valCol">' + sCol + '</span></div>';
     }).join('') + '</div>';
   if (playerWon) {
     playChampionFanfare();
     addConfetti(ball.x, ball.y - 20, 70);
-    raceTarget += 500; // each win raises the bar for the next race
+    raceTarget += 250; // each win raises the bar for the next race
   }
   const nextGoalLine = playerWon
-    ? '<p style="opacity:1;font-weight:800;color:#7ce8ff;">🎯 Next race: first to ' + raceTarget + '</p>'
+    ? '<p style="opacity:1;font-weight:800;color:#7ce8ff;">🎯 Next race: first to ' + raceTarget + 'm</p>'
     : '';
   // session-wide championship tally, rendered as a small table
   const tallyColors = { 'YOU': '#ffe066' };
@@ -3677,7 +3861,7 @@ function showRaceResult(playerWon, winnerName, reason) {
     ${rows}
     ${tallyLine}
     ${nextGoalLine}
-    <p>Distance: ${Math.round(cameraY / 10)}m &nbsp;·&nbsp; Match Time: ${formatMatchTime(elapsedMs)}</p>
+
     <button id="playAgainBtn">Race Again</button>
     <button id="menuBtn">Menu</button>
   `;
@@ -3692,6 +3876,7 @@ function showRaceResult(playerWon, winnerName, reason) {
 }
 
 function showGameOver() {
+  document.getElementById('muteBtn').classList.add('show');
   playWhistle(true);
   stormWarning.classList.remove('show');
   overlay.classList.remove('hidden');
@@ -3740,9 +3925,7 @@ function wireMenu() {
     try { sBtn.disabled = true; startGame(); } catch (err) { showRealError(err); }
   });
   const goalEl = document.getElementById('raceChipGoal');
-  if (goalEl) goalEl.textContent = 'first to ' + raceTarget;
-  const diffSel = document.getElementById('diffSelect');
-  diffSel.classList.toggle('show', gameMode === 'race');
+  if (goalEl) goalEl.textContent = 'first to ' + raceTarget + 'm';
   document.querySelectorAll('.diffChip').forEach(function(chip) {
     chip.classList.toggle('selected', chip.dataset.diff === raceDifficulty);
     chip.addEventListener('click', function() {
@@ -3753,6 +3936,16 @@ function wireMenu() {
       } catch (err) { showRealError(err); }
     });
   });
+  const muteBtn = document.getElementById('muteBtn');
+  function renderMute() { muteBtn.textContent = soundMuted ? '🔇' : '🔊'; }
+  renderMute();
+  muteBtn.classList.add('show'); // visible on the opening menu
+  muteBtn.addEventListener('click', function() {
+    soundMuted = !soundMuted;
+    try { localStorage.setItem('jumpyMuted', soundMuted ? '1' : '0'); } catch (e) {}
+    renderMute();
+    if (!soundMuted) beep({ freq: 660, duration: 0.08, type: 'sine', volume: 0.15 });
+  });
   document.querySelectorAll('.modeChip').forEach(function(chip) {
     // reflect the current mode selection
     chip.classList.toggle('selected', chip.dataset.mode === gameMode);
@@ -3761,7 +3954,6 @@ function wireMenu() {
         gameMode = chip.dataset.mode;
         document.querySelectorAll('.modeChip').forEach(function(c) { c.classList.remove('selected'); });
         chip.classList.add('selected');
-        document.getElementById('diffSelect').classList.toggle('show', gameMode === 'race');
       } catch (err) { showRealError(err); }
     });
   });
@@ -3769,6 +3961,7 @@ function wireMenu() {
 wireMenu();
 
 function backToMenu() {
+  document.getElementById('muteBtn').classList.add('show');
   overlay.innerHTML = MENU_HTML;
   overlay.classList.remove('hidden');
   wireMenu();
