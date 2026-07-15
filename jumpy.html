@@ -21,7 +21,7 @@
     overflow: hidden;
     touch-action: none;
   }
-  #wrap { position: relative; box-shadow: 0 0 60px rgba(0,0,0,0.55); }
+  #wrap { position: relative; }
   canvas { display: block; }
   #hud {
     position: absolute;
@@ -784,6 +784,9 @@ try {
 const canvas = document.getElementById('game');
 // The world's logical size adapts to the screen's aspect ratio (once, at load):
 // tall phones get a taller playfield, wide tablets get a WIDER one — no bands
+// ================================================================
+// DISPLAY & CANVAS — logical sizing, HiDPI, viewport fit
+// ================================================================
 (function fitLogicalSize() {
   const vw = Math.max(300, window.innerWidth);
   const vh = Math.max(480, window.innerHeight);
@@ -805,6 +808,15 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const mainCtx = ctx;
 const W = canvas.width, H = canvas.height;
+
+// ---- HiDPI: render at device resolution (capped 2x) so retina phones and
+// scaled desktops get pixel-crisp output instead of CSS-upscaled blur ----
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+if (DPR !== 1) {
+  canvas.width = Math.round(W * DPR);
+  canvas.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
 
 // Scale the whole game (canvas + HUD overlays together) to fill the viewport
 const wrapEl = document.getElementById('wrap');
@@ -943,6 +955,9 @@ let goalGame = { active: false };
 let goalPausedAt = 0;
 
 // --- Bot racers: three AI opponents climbing the same board against you ---
+// ================================================================
+// RIVAL BOTS — personas, presets, altitude-neutral accounting
+// ================================================================
 const BOT_CONFIG = [
   { name: 'Jumpinho',    emoji: '🇧🇷', color: '#2ecc71', steer: 4.5, errPx: 22, reactFrames: 17, blunder: 0.020 },
   { name: 'Sir Offside', emoji: '🇺🇸', color: '#4aa3ff', steer: 4.7, errPx: 15, reactFrames: 13, blunder: 0.014 },
@@ -950,8 +965,6 @@ const BOT_CONFIG = [
 ];
 // Bot skill presets per race difficulty (multipliers over each bot's base config)
 const DIFF_PRESETS = {
-  easy:   { steer: 0.88, err: 1.55, react: 1.55, blunder: 2.00, ahead: 1.05, rubber: 0    },
-  normal: { steer: 1.00, err: 1.00, react: 1.00, blunder: 1.00, ahead: 1.55, rubber: 0.85 },
   hard:   { steer: 1.16, err: 0.55, react: 0.60, blunder: 0.45, ahead: 2.05, rubber: 1.25 }
 };
 let bots = [];
@@ -967,12 +980,14 @@ let raceWins = {};     // session-wide win tally per racer, shown after every ra
 let raceOver = false;
 let raceFinishCount = 0; // how many rivals have crossed the line before you
 // ⚔️ GOLDEN DUEL: 1v1 vs a rival — goal gates in the sky, first to 3 goals
+// ================================================================
+// GOLDEN DUEL — 1v1 state: gates, scores
+// ================================================================
 const DUEL_GOALS_TO_WIN = 3;
 const DUEL_GATE_STEP = 250;   // meters between goal gates
 let duelScoreYou = 0;
 let duelScoreRival = 0;
 let duelGateM = DUEL_GATE_STEP;
-let duelRivalShotT = 0;       // suspense timer for the rival's attempt
 let raceCountdown = 0;       // frames of pre-race countdown remaining
 let prevLeaderName = '';     // for overtake notifications
 let leadChangeCooldown = 0;  // throttle for lead-change popups
@@ -982,6 +997,9 @@ let finalStretchShown = false;
 function racing() { return gameMode === 'race' || gameMode === 'duel'; }
 
 // The race is decided by DISTANCE (meters climbed), not points
+// ================================================================
+// RACE CORE — distance metrics, standings, ranks
+// ================================================================
 function playerRaceDistM() {
   return Math.floor((cameraY + Math.max(0, (H - 100) - ball.y)) / 10);
 }
@@ -1000,7 +1018,6 @@ function initBots() {
   duelScoreYou = 0;
   duelScoreRival = 0;
   duelGateM = DUEL_GATE_STEP;
-  duelRivalShotT = 0;
   if (!racing()) { bots = []; return; }
   const P = DIFF_PRESETS[raceDifficulty];
   const roster = gameMode === 'duel'
@@ -1386,6 +1403,9 @@ const stormWarning = document.getElementById('stormWarning');
 const shieldTag = document.getElementById('shieldTag');
 
 // --- Sound engine (procedural, no audio files needed) ---
+// ================================================================
+// AUDIO — WebAudio synth: beeps, roars, whistles, fanfares
+// ================================================================
 let audioCtx = null;
 let soundMuted = false;
 try { soundMuted = localStorage.getItem('jumpyMuted') === '1'; } catch (e) {}
@@ -1699,18 +1719,31 @@ function randomUnlockedFlagIndex(h) {
   return flagOrder[Math.floor(Math.random() * (flagIndexForHeight(h) + 1))];
 }
 
+// ================================================================
+// WORLD GENERATION — platforms, items, difficulty law
+// ================================================================
+// The ONE platform difficulty law — used by fresh spawns and the recycler alike
+function platformStatsAt(diff, climbed) {
+  const late = lateDifficultyAt(climbed);
+  return {
+    w: Math.max(33, PLATFORM_W - diff * 24 - late * 9),
+    movingChance: 0.2 + diff * 0.42 + late * 0.2,
+    speed: randRange(1 + diff * 1.3, 2 + diff * 2.4) + late * 1.3
+  };
+}
+
 function spawnPlatform(y, diff, climbed) {
   diff = diff || 0;
   climbed = climbed || 0;
-  const w = Math.max(33, PLATFORM_W - diff * 24 - lateDifficultyAt(climbed) * 9);
+  const st = platformStatsAt(diff, climbed);
+  const w = st.w;
   const x = randRange(10, W - w - 10);
-  const movingChance = 0.2 + diff * 0.42 + lateDifficultyAt(climbed) * 0.2;
-  const moving = Math.random() < movingChance && y < H - 200;
+  const moving = Math.random() < st.movingChance && y < H - 200;
   platforms.push({
     x, y, w,
     moving,
     dir: Math.random() < 0.5 ? 1 : -1,
-    speed: randRange(1 + diff * 1.3, 2 + diff * 2.4) + lateDifficultyAt(climbed) * 1.3
+    speed: st.speed
   });
   const roll = Math.random();
   if (roll < 0.56) {
@@ -1752,6 +1785,7 @@ function resetGame() {
   goalGame = { active: false };
   boostsQueued = 0;
   boostDistLeft = 0;
+  simLast = 0; // fresh clock for the loop
   raceCountdown = racing() ? 230 : 0; // goal message, then 3…2…1…GO!
   document.getElementById('raceGoal').style.display = racing() ? 'block' : 'none';
   document.getElementById('raceGoal').textContent = gameMode === 'duel'
@@ -1839,6 +1873,9 @@ function addConfetti(x, y, count) {
 }
 
 // ============ GOLDEN GOAL: sky-stadium penalty kick bonus stage ============
+// ================================================================
+// GOLDEN GOAL — penalty mini-game (player & rival shots)
+// ================================================================
 function startGoalGame(shooter) {
   goalGame = {
     active: true, phase: 'aim', t: 0,
@@ -2511,11 +2548,12 @@ function update() {
         const gap = sameRow ? randRange(0, 16)
           : randRange(62, Math.min(MAX_SAFE_GAP, 96 + diff * 48 + lateDifficultyAt(cameraY) * 14));
         p.y = (topY === Infinity) ? -gap : topY - gap;
-        p.w = Math.max(33, PLATFORM_W - diff * 24 - lateDifficultyAt(cameraY) * 9);
+        const st = platformStatsAt(diff, cameraY);
+        p.w = st.w;
         p.x = randRange(10, W - p.w - 10);
-        p.moving = Math.random() < (0.2 + diff * 0.42 + lateDifficultyAt(cameraY) * 0.2);
+        p.moving = Math.random() < st.movingChance;
         p.dir = Math.random() < 0.5 ? 1 : -1;
-        p.speed = randRange(1 + diff * 1.3, 2 + diff * 2.4) + lateDifficultyAt(cameraY) * 1.3;
+        p.speed = st.speed;
       }
     }
     for (const f of flags) {
@@ -2589,9 +2627,11 @@ function update() {
 
 let playerFalls = 0;
 let playerEliminated = false; // legacy flag, always false under endless-lives race rules
-const RACE_FALL_PENALTY = 60;
 const LIFE_LOSS_PENALTY = 50; // classic: every lost life costs this, fall or storm alike
 
+// ================================================================
+// LIVES & DEATH — unified penalties, revive
+// ================================================================
 function handleDeath(reason) {
   if (racing()) {
     // race/duel rules: endless lives — a fall costs TIME plus the unified points penalty
@@ -2998,6 +3038,9 @@ function drawFloodlightPylon(x, leansRight) {
 }
 
 let skyGradCache = { key: -1, grad: null };
+// ================================================================
+// RENDERING — background, world, entities, HUD overlays
+// ================================================================
 function drawBackground(diff) {
   const t = diff;
   // gradient rebuilt only when the sky has visibly shifted (mobile perf)
@@ -3950,42 +3993,39 @@ function showRealError(err) {
   running = false;
 }
 
-// ---- adaptive resolution: JS is ~1ms/frame; slow machines are raster-bound.
-// If FPS sags, render the world at reduced resolution and let CSS upscale. ----
-let renderScale = 1;
-let perfFrames = 0;
-let perfWindowStart = 0;
-function applyRenderScale(s) {
-  renderScale = s;
-  canvas.width = Math.round(W * s);
-  canvas.height = Math.round(H * s);
-  ctx.setTransform(s, 0, 0, s, 0, 0);
-  skyGradCache = { key: null, grad: null }; // gradients bind to the context state
-  mtnCache = { key: '', sprite: mtnCache.sprite };
-}
-function perfTick(now) {
-  if (renderScale <= 0.72) return;      // already degraded — stop
-  if (!perfWindowStart) { perfWindowStart = now; perfFrames = 0; return; }
-  perfFrames++;
-  const span = now - perfWindowStart;
-  if (span >= 2000) {
-    const fps = perfFrames / (span / 1000);
-    if (fps < 44 && W > 700) applyRenderScale(0.72);      // big pitches: 48% fewer pixels
-    else if (fps < 38) applyRenderScale(0.8);             // small screens struggling too
-    perfWindowStart = now;
-    perfFrames = 0;
-  }
-}
+// ================================================================
+// MAIN LOOP — fixed-timestep simulation, render pass
+// ================================================================
+// NATIVE-RATE stepping, exactly like the game was always tuned: one update per
+// display frame on any healthy screen (60Hz, 120Hz ProMotion, 144Hz — the
+// original feel on each device). Only when a machine genuinely drops frames
+// (frame gap > ~22ms) do we run catch-up ticks so the world never goes
+// slow-motion. Healthy devices are byte-for-byte the classic loop.
+const SIM_STEP = 1000 / 60;
+let simLast = 0;
 
-function loop() {
+function loop(ts) {
   if (!running) return;
   if (paused) {
+    simLast = 0; // don't count paused time
     rafId = requestAnimationFrame(loop);
     return;
   }
-  perfTick(performance.now());
+  if (!ts) ts = performance.now();
+  const dt = simLast ? Math.min(100, ts - simLast) : SIM_STEP;
+  simLast = ts;
   try {
-    update();
+    if (dt <= 22) {
+      update(); // healthy frame rate: the original one-update-per-frame feel
+    } else {
+      // struggling machine: catch up (max 3) so game speed stays real-time
+      let ticks = Math.min(3, Math.round(dt / SIM_STEP));
+      while (ticks-- > 0) {
+        update();
+        if (!running || paused) break;
+      }
+    }
+    if (!running) return;
     draw();
     renderRaceBoard();
     matchClockEl.textContent = formatMatchTime(Date.now() - matchStartTime);
@@ -4027,6 +4067,9 @@ function startGame() {
   }
 }
 
+// ================================================================
+// RESULT SCREENS & MENUS — duel/race/classic endings
+// ================================================================
 function showDuelResult(youWon, rival) {
   goalGame.active = false;   // cancel any kick still pending behind the result
   goalPendingCount = 0;
