@@ -12,7 +12,7 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; overflow: hidden; }
   body {
-    background: #1a2b4a;
+    background: linear-gradient(180deg, #0d1830 0%, #1a2b4a 45%, #24395e 100%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -21,7 +21,7 @@
     overflow: hidden;
     touch-action: none;
   }
-  #wrap { position: relative; }
+  #wrap { position: relative; box-shadow: 0 0 60px rgba(0,0,0,0.55); }
   canvas { display: block; }
   #hud {
     position: absolute;
@@ -389,6 +389,8 @@
   }
   #modeSelect {
     display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     gap: 8px;
     margin-top: 10px;
   }
@@ -397,7 +399,7 @@
     flex-direction: column;
     align-items: center;
     gap: 1px;
-    padding: 7px 16px;
+    padding: 7px 11px;
     font-size: 13px;
     font-weight: 800;
     letter-spacing: 1px;
@@ -445,6 +447,17 @@
     box-shadow: 0 0 10px rgba(64,196,255,0.5);
   }
   #overlay p { font-size: 14px; margin: 5px 0; opacity: 0.85; }
+  .secondaryBtn {
+    margin-top: 8px;
+    padding: 9px 22px;
+    border-radius: 22px;
+    border: 2px solid rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
   #startBtn, #playAgainBtn, #resumeBtn {
     margin-top: 14px;
     padding: 12px 34px;
@@ -752,6 +765,7 @@
     <div id="modeSelect">
       <button class="modeChip selected" data-mode="classic">🏃 CLASSIC<span>endless climb</span></button>
       <button class="modeChip" data-mode="race">🏁 RACE<span id="raceChipGoal">first to 1000m</span></button>
+      <button class="modeChip" data-mode="duel">⚔️ DUEL<span>first to 3 goals</span></button>
     </div>
     <button id="startBtn">KICK OFF</button>
   </div>
@@ -776,14 +790,17 @@ const canvas = document.getElementById('game');
   const aspect = vw / vh;
   let w = 400, h = Math.round(400 / aspect);
   if (h < 700) {
-    // squarish/wide screen (iPad): keep the tuned 700 height, widen the pitch
+    // squarish/wide screen (iPad, desktop): keep the tuned 700 height, widen the pitch.
+    // Full 16:9 support: a 1920x1080 screen gets a true 1244x700 world.
     h = 700;
-    w = Math.min(560, Math.round(700 * aspect));
+    w = Math.min(1280, Math.round(700 * aspect));
   } else if (h > 960) {
     h = 960; // ultra-tall phones cap out
   }
   canvas.width = w;
   canvas.height = h;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
 })();
 const ctx = canvas.getContext('2d');
 const mainCtx = ctx;
@@ -817,7 +834,8 @@ const ball = {
 
 const GRAVITY = 0.28;
 const BOUNCE_VELOCITY = -10.5;
-const MOVE_SPEED = 4.5;
+// wider pitch = proportionally faster travel, so crossing never feels sluggish
+const MOVE_SPEED = 4.5 * (1 + (W - 400) / 400 * 0.5); // 400w: 4.5 -> 1244w: ~9.2
 const PLATFORM_W = 62, PLATFORM_H = 14;
 const FLAG_R = 10;
 const CANDY_R = 9;
@@ -886,8 +904,8 @@ function togglePause() {
       '<div class="psRow"><b>Distance</b><span>' + distM + 'm · best ' + Math.max(bestHeight, distM) + 'm</span></div>' +
       '<div class="psRow"><b>Time</b><span>' + formatMatchTime(pausedAt - matchStartTime) + ' · best ' + formatMatchTime(Math.max(bestTimeMs, pausedAt - matchStartTime)) + '</span></div>' +
       '<div class="psRow"><b>Flags</b><span>🚩 ' + flagsCollectedCount + '</span></div>' +
-      '<div class="psRow"><b>Lives</b><span>' + (gameMode === 'race' ? '⚽ ∞' : '⚽'.repeat(lives)) + '</span></div>';
-    if (gameMode === 'race') {
+      '<div class="psRow"><b>Lives</b><span>' + (racing() ? '⚽ ∞' : '⚽'.repeat(lives)) + '</span></div>';
+    if (racing()) {
       const st = raceStandings();
       const place = st.findIndex(function(e) { return e.you; }) + 1;
       rows += '<div class="psRow"><b>Race</b><span>' + place + ' of ' + st.length + ' · 🎯 ' + raceTarget + '</span></div>';
@@ -934,7 +952,7 @@ const BOT_CONFIG = [
 const DIFF_PRESETS = {
   easy:   { steer: 0.88, err: 1.55, react: 1.55, blunder: 2.00, ahead: 1.05, rubber: 0    },
   normal: { steer: 1.00, err: 1.00, react: 1.00, blunder: 1.00, ahead: 1.55, rubber: 0.85 },
-  hard:   { steer: 1.10, err: 0.65, react: 0.68, blunder: 0.55, ahead: 1.80, rubber: 1.15 }
+  hard:   { steer: 1.16, err: 0.55, react: 0.60, blunder: 0.45, ahead: 2.05, rubber: 1.25 }
 };
 let bots = [];
 let recentScroll = 0; // decaying measure of how fast the camera is climbing
@@ -948,10 +966,20 @@ let raceTarget = 1000; // climb score to win the race; increases each time you w
 let raceWins = {};     // session-wide win tally per racer, shown after every race
 let raceOver = false;
 let raceFinishCount = 0; // how many rivals have crossed the line before you
+// ⚔️ GOLDEN DUEL: 1v1 vs a rival — goal gates in the sky, first to 3 goals
+const DUEL_GOALS_TO_WIN = 3;
+const DUEL_GATE_STEP = 250;   // meters between goal gates
+let duelScoreYou = 0;
+let duelScoreRival = 0;
+let duelGateM = DUEL_GATE_STEP;
+let duelRivalShotT = 0;       // suspense timer for the rival's attempt
 let raceCountdown = 0;       // frames of pre-race countdown remaining
 let prevLeaderName = '';     // for overtake notifications
 let leadChangeCooldown = 0;  // throttle for lead-change popups
 let finalStretchShown = false;
+
+// race-like modes share the rival/board/endless-lives machinery
+function racing() { return gameMode === 'race' || gameMode === 'duel'; }
 
 // The race is decided by DISTANCE (meters climbed), not points
 function playerRaceDistM() {
@@ -961,7 +989,7 @@ function playerRaceDistM() {
 // Rubber-banding: trailing bots push harder, leaders ease off (scaled by difficulty)
 function rubberBandFactor(b) {
   const strength = DIFF_PRESETS[raceDifficulty].rubber;
-  if (!strength || gameMode !== 'race') return 1;
+  if (!strength || !racing()) return 1;
   const gap = playerRaceDistM() - b.bestClimb; // meters; positive = bot is behind
   if (gap > 0) return 1 + Math.min(0.38, gap / 880) * strength;
   return 1 - Math.min(0.22, -gap / 1400) * strength;
@@ -969,12 +997,19 @@ function rubberBandFactor(b) {
 
 function initBots() {
   raceFinishCount = 0;
-  if (gameMode !== 'race') { bots = []; return; }
+  duelScoreYou = 0;
+  duelScoreRival = 0;
+  duelGateM = DUEL_GATE_STEP;
+  duelRivalShotT = 0;
+  if (!racing()) { bots = []; return; }
   const P = DIFF_PRESETS[raceDifficulty];
-  bots = BOT_CONFIG.map(function(cfg, i) {
+  const roster = gameMode === 'duel'
+    ? [BOT_CONFIG[Math.floor(Math.random() * BOT_CONFIG.length)]]
+    : BOT_CONFIG;
+  bots = roster.map(function(cfg, i) {
     return {
       id: i, name: cfg.name, emoji: cfg.emoji, color: cfg.color,
-      steer: cfg.steer * P.steer,
+      steer: cfg.steer * P.steer * (1 + (W - 400) / 400 * 0.5),
       errPx: cfg.errPx * P.err,
       reactFrames: Math.round(cfg.reactFrames * P.react),
       blunder: cfg.blunder * P.blunder,
@@ -999,7 +1034,7 @@ function botGoBehind(b) {
 }
 
 function updateBots() {
-  if (gameMode !== 'race' || !bots.length || raceOver) return;
+  if (!racing() || !bots.length || raceOver) return;
   // your rocket is YOUR moment: rivals gain nothing while you boost
   const gainsFrozen = boostTimer > 0;
   for (const b of bots) {
@@ -1088,9 +1123,12 @@ function updateBots() {
     }
 
     // --- steering + physics ---
-    if (b.x < b.targetX - 6) b.vx = effSteer;
-    else if (b.x > b.targetX + 6) b.vx = -effSteer;
-    else b.vx = 0;
+    // smooth steering: ease toward full speed, settle softly onto the target
+    let wantVx;
+    if (b.x < b.targetX - 4) wantVx = effSteer;
+    else if (b.x > b.targetX + 4) wantVx = -effSteer;
+    else wantVx = (b.targetX - b.x) * 0.3;
+    b.vx += (wantVx - b.vx) * 0.22;
     b.x += b.vx;
     b.x = Math.max(10, Math.min(W - 10, b.x));
     b.vy += GRAVITY;
@@ -1121,7 +1159,7 @@ function updateBots() {
           b.flagPoints += 10;
           b.flagCounts[f.countryIdx] = (b.flagCounts[f.countryIdx] || 0) + 1;
           const c = b.flagCounts[f.countryIdx];
-          if (c % 5 === 0 && c % 10 !== 0) {
+          if (c % 5 === 0 && (c % 10 !== 0 || gameMode === 'duel')) {
             // same 5-of-a-kind MEGA BOOST as yours: a real 300m
             b.altOffset -= 3000;
             b.vy = -20; // visual launch
@@ -1129,7 +1167,7 @@ function updateBots() {
             addPopup('🚀 ' + b.name + ' MEGA BOOST +300m!', W / 2, 110, b.color);
             playAirHorn(false);
           }
-          if (c % 10 === 0 && b.penaltyT <= 0) {
+          if (c % 10 === 0 && b.penaltyT <= 0 && gameMode !== 'duel') {
             b.penaltyT = 85;
             addPopup('🥅 ' + b.name + ' steps up…', W / 2, 110, b.color);
             playWhistle(false);
@@ -1210,7 +1248,7 @@ function rankLabel(rank) {
   return rank === 1 ? '🏆' : rank === 2 ? '2nd' : rank === 3 ? '3rd' : rank + 'th';
 }
 function updateRaceLeader() {
-  if (gameMode !== 'race' || !bots.length) { raceLeaderName = ''; raceRanks = {}; return; }
+  if (!racing() || !bots.length) { raceLeaderName = ''; raceRanks = {}; return; }
   const st = raceStandings();
   raceLeaderName = st[0].name;
   raceRanks = {};
@@ -1234,7 +1272,7 @@ function renderRaceBoard() {
   raceBoardT++;
   if (raceBoardT % 15 !== 0) return; // update ~4x per second
   const boardEl = document.getElementById('raceBoard');
-  if (gameMode !== 'race') { if (boardEl.innerHTML) boardEl.innerHTML = ''; return; }
+  if (!racing()) { if (boardEl.innerHTML) boardEl.innerHTML = ''; return; }
   const entries = raceStandings();
   let html = '';
   for (let i = 0; i < entries.length; i++) {
@@ -1304,7 +1342,7 @@ let lastMilestone = 0;
 const livesDisplayEl = document.getElementById('livesDisplay');
 const flagCounterEl = document.getElementById('flagCounter');
 function renderLives() {
-  if (gameMode === 'race') {
+  if (racing()) {
     livesDisplay.innerHTML = '⚽ ∞';
     return;
   }
@@ -1626,6 +1664,15 @@ function initPlatforms() {
   while (y > -H) {
     const climbedSoFar = startY - y;
     spawnPlatform(y, difficultyAt(climbedSoFar), climbedSoFar);
+    // wide pitch (tablet/desktop/16:9): extra same-row platforms keep reaches fair —
+    // roughly one platform per 400px of width on every row
+    let extras = (W - 400) / 380;
+    while (extras > 0) {
+      if (extras >= 1 || Math.random() < extras) {
+        spawnPlatform(y - randRange(0, 18), difficultyAt(climbedSoFar), climbedSoFar);
+      }
+      extras -= 1;
+    }
     y -= randRange(58, 98);
   }
 }
@@ -1666,18 +1713,18 @@ function spawnPlatform(y, diff, climbed) {
     speed: randRange(1 + diff * 1.3, 2 + diff * 2.4) + lateDifficultyAt(climbed) * 1.3
   });
   const roll = Math.random();
-  if (roll < 0.52) {
+  if (roll < 0.56) {
     flags.push({
       x: x + w/2, y: y - 32, collected: false, bob: Math.random()*Math.PI*2,
       countryIdx: randomUnlockedFlagIndex(climbed)
     });
-  } else if (roll < 0.66) {
+  } else if (roll < 0.70) {
     candies.push({
       x: x + w/2, y: y - 32, collected: false, bob: Math.random()*Math.PI*2,
       color: CANDY_COLORS[Math.floor(Math.random()*CANDY_COLORS.length)],
       twist: randRange(-0.3, 0.3)
     });
-  } else if (roll < 0.71) {
+  } else if (roll < 0.75) {
     gifts.push({ x: x + w/2, y: y - 32, collected: false, bob: Math.random()*Math.PI*2 });
   }
 }
@@ -1705,9 +1752,11 @@ function resetGame() {
   goalGame = { active: false };
   boostsQueued = 0;
   boostDistLeft = 0;
-  raceCountdown = gameMode === 'race' ? 230 : 0; // goal message, then 3…2…1…GO!
-  document.getElementById('raceGoal').style.display = gameMode === 'race' ? 'block' : 'none';
-  document.getElementById('raceGoal').textContent = '🎯 FIRST TO ' + raceTarget + 'm';
+  raceCountdown = racing() ? 230 : 0; // goal message, then 3…2…1…GO!
+  document.getElementById('raceGoal').style.display = racing() ? 'block' : 'none';
+  document.getElementById('raceGoal').textContent = gameMode === 'duel'
+    ? '⚔️ FIRST TO ' + DUEL_GOALS_TO_WIN + ' GOALS'
+    : '🎯 FIRST TO ' + raceTarget + 'm';
   prevLeaderName = '';
   leadChangeCooldown = 0;
   finalStretchShown = false;
@@ -1790,10 +1839,12 @@ function addConfetti(x, y, count) {
 }
 
 // ============ GOLDEN GOAL: sky-stadium penalty kick bonus stage ============
-function startGoalGame() {
+function startGoalGame(shooter) {
   goalGame = {
     active: true, phase: 'aim', t: 0,
-    lockT: 180, // 3s: big 3-2-1 countdown — taps can't kick yet
+    shooter: shooter || 'you',
+    lockT: shooter === 'rival' ? 90 : 120, // build-up: taps can't kick yet
+    autoKickAt: 50 + Math.random() * 130,  // rival picks his own moment
     aimX: 0, keeperX: 0, kickAim: 0, shotT: 0,
     result: '', resT: 0, netRipple: 0
   };
@@ -1803,8 +1854,9 @@ function startGoalGame() {
   playCrowdRoar(0.9, 0.07);
 }
 
-function kickGoalBall() {
+function kickGoalBall(auto) {
   if (!goalGame.active || goalGame.phase !== 'aim' || goalGame.lockT > 0) return;
+  if (goalGame.shooter === 'rival' && !auto) return; // you can only watch the rival's shot
   goalGame.kickAim = goalGame.aimX;
   goalGame.keeperAtKick = goalGame.keeperX;
   goalGame.phase = 'shot';
@@ -1815,6 +1867,41 @@ function kickGoalBall() {
 function finishGoalGame() {
   goalGame.active = false;
   matchStartTime += Date.now() - goalPausedAt; // bonus stage doesn't eat the clock
+  if (gameMode === 'duel') {
+    const rival = bots[0];
+    if (goalGame.shooter === 'rival') {
+      if (goalGame.result === 'goal') {
+        duelScoreRival++;
+        showReward('😱 ' + rival.name + ' SCORES!', '#ff6b6b', '255,107,107', '🥅', 'YOU ' + duelScoreYou + ' — ' + duelScoreRival + ' ' + rival.name);
+        if (duelScoreRival >= DUEL_GOALS_TO_WIN) {
+          raceOver = true;
+          running = false;
+          showDuelResult(false, rival);
+          return;
+        }
+      } else {
+        showReward('🧤 WHAT A SAVE!', '#7ce8ff', '124,232,255', '🧤', rival.name + ' denied — race on!');
+        playCrowdRoar(0.9, 0.06);
+      }
+      duelGateM += DUEL_GATE_STEP;
+      return;
+    }
+    if (goalGame.result === 'goal') {
+      duelScoreYou++;
+      addConfetti(ball.x, ball.y, 50);
+      showReward('⚽ GOOOAL!', '#ffd54f', '255,213,79', '🏆', 'YOU ' + duelScoreYou + ' — ' + duelScoreRival + ' ' + (rival ? rival.name : ''));
+      playAirHorn(true);
+      if (duelScoreYou >= DUEL_GOALS_TO_WIN) {
+        raceOver = true;
+        running = false;
+        showDuelResult(true, rival);
+        return;
+      }
+    } else {
+      showReward('🧤 SAVED!', '#cfd8e3', '207,216,227', '😤', 'shake it off — next gate awaits');
+    }
+    return;
+  }
   if (goalGame.result === 'goal') {
     boostsQueued = 2;             // two more launches queued...
     boostTimer = 450;             // ...and the first fires right now
@@ -1834,7 +1921,8 @@ function updateGoalGame() {
   if (g.phase === 'aim') {
     g.aimX = Math.sin(g.t * 0.052);                 // sweeping aim
     g.keeperX = Math.sin(g.t * 0.033 + 1.7) * 0.55; // patrolling keeper
-    if (g.t > 420) kickGoalBall();                  // hesitate too long and it auto-fires
+    if (g.shooter === 'rival' && g.t >= g.autoKickAt) kickGoalBall(true); // he strikes!
+    if (g.t > 420) kickGoalBall(true);              // hesitate too long and it auto-fires
   } else if (g.phase === 'shot') {
     g.shotT++;
     // the keeper DIVES toward the shot — beat his reach from where he stood
@@ -1851,8 +1939,8 @@ function updateGoalGame() {
       } else {
         g.result = 'goal';
         g.netRipple = 14;
-        playCrowdRoar(1.6, 0.14);
-        playChampionFanfare();
+        playCrowdRoar(g.shooter === 'rival' ? 1.0 : 1.6, g.shooter === 'rival' ? 0.06 : 0.14);
+        if (g.shooter !== 'rival') playChampionFanfare();
       }
       g.phase = 'result';
       g.resT = 0;
@@ -1968,8 +2056,26 @@ function drawGoalGame() {
   }
   ctx.save();
   ctx.translate(bx, by);
-  drawTriondaCharacter(br, 1, g.t * 0.12);
+  if (g.shooter === 'rival' && bots[0]) {
+    // the rival's ball: his color, his badge
+    const rv = bots[0];
+    ctx.beginPath(); ctx.arc(0, 0, br, 0, Math.PI * 2);
+    ctx.fillStyle = '#f5f5f5'; ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = rv.color; ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, br * 0.45, 0, Math.PI * 2);
+    ctx.fillStyle = rv.color; ctx.fill();
+  } else {
+    drawTriondaCharacter(br, 1, g.t * 0.12);
+  }
   ctx.restore();
+  if (g.shooter === 'rival' && bots[0] && g.phase === 'aim') {
+    ctx.font = '800 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    ctx.strokeText(bots[0].name, bx, by + br + 16);
+    ctx.fillStyle = bots[0].color;
+    ctx.fillText(bots[0].name, bx, by + br + 16);
+  }
 
   // aim indicator: dashed sight-line + target ring
   if (g.phase === 'aim') {
@@ -1995,14 +2101,18 @@ function drawGoalGame() {
   ctx.textAlign = 'center';
   ctx.font = '800 13px sans-serif';
   ctx.fillStyle = '#ffd54f';
-  ctx.fillText('🥅 GOLDEN GOAL', cx, 92);
+  ctx.fillText(g.shooter === 'rival' ? '🥅 RIVAL SHOT' : '🥅 GOLDEN GOAL', cx, 92);
   ctx.font = '700 10px sans-serif';
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.fillText('beat the keeper — win 3 MEGA BOOSTS', cx, 108);
+  ctx.fillText(g.shooter === 'rival' ? (bots[0] ? bots[0].name : 'rival') + ' shoots — pray your keeper saves!'
+    : gameMode === 'duel' ? 'beat the keeper — SCORE FOR THE DUEL!' : 'beat the keeper — win 3 MEGA BOOSTS', cx, 108);
   if (g.phase === 'aim') {
     ctx.font = '800 17px sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,' + (0.55 + 0.45 * Math.abs(Math.sin(g.t * 0.09))) + ')';
-    if (goalGame.lockT > 0) {
+    if (goalGame.shooter === 'rival') {
+      ctx.fillText(goalGame.lockT > 0 ? (bots[0] ? bots[0].name.toUpperCase() : 'RIVAL') + ' STEPS UP…' : 'HE SHOOTS…', cx, H - 70);
+    } else if (goalGame.lockT > 0) {
+      // player's shot: GET READY + big pulsing digits
       ctx.fillText('GET READY…', cx, H - 70);
       // big 3-2-1 in the middle, pulsing as each second lands
       const n = Math.ceil(goalGame.lockT / 60);
@@ -2055,7 +2165,9 @@ function update() {
     const inGoalPhase = raceCountdown > 165;
     let label;
     if (inGoalPhase) {
-      label = '🎯 FIRST TO ' + raceTarget + 'm';
+      label = gameMode === 'duel'
+        ? '⚔️ FIRST TO ' + DUEL_GOALS_TO_WIN + ' GOALS — beat ' + (bots[0] ? bots[0].name : 'your rival') + '!'
+        : '🎯 FIRST TO ' + raceTarget + 'm';
     } else {
       const step = Math.ceil(raceCountdown / 55); // 3, 2, 1, then 0 = GO
       label = step >= 1 ? String(step) : 'GO!';
@@ -2186,14 +2298,14 @@ function update() {
         playAirHorn(false);
       }
       // Collecting 5 flags of the same country launches a MEGA BOOST
-      if (flagCountsByCountry[f.countryIdx] % 5 === 0 && flagCountsByCountry[f.countryIdx] % 10 !== 0) {
+      if (flagCountsByCountry[f.countryIdx] % 5 === 0 && (flagCountsByCountry[f.countryIdx] % 10 !== 0 || gameMode === 'duel')) {
         const nation = FLAG_NATIONS[f.countryIdx] || FLAG_NATIONS[0];
         triggerMegaBoost(nation, flagCountsByCountry[f.countryIdx]);
       }
       // Collecting 10 flags of the same country earns a GOLDEN GOAL penalty kick!
-      if (flagCountsByCountry[f.countryIdx] % 10 === 0) {
+      if (flagCountsByCountry[f.countryIdx] % 10 === 0 && gameMode !== 'duel') {
         const nation = FLAG_NATIONS[f.countryIdx] || FLAG_NATIONS[0];
-        goalPendingCount++;
+        goalPendingCount = 1; // one attempt per golden goal — never stacks
         addConfetti(f.x, f.y, 25);
         showReward('🥅 GOLDEN GOAL EARNED!', '#ffd54f', '255,213,79',
           nation.emoji, nation.emoji + ' × ' + flagCountsByCountry[f.countryIdx]);
@@ -2249,10 +2361,27 @@ function update() {
   if (trophyTimer > 0) trophyTimer--;
 
   // GOLDEN GOAL trigger: earned via 10 same flags, fired when safe (not mid-rocket)
-  if (running && !paused && !playerEliminated && goalPendingCount > 0 && boostTimer <= 0 && reviveGraceTimer <= 0) {
+  if (running && !paused && !playerEliminated && goalPendingCount > 0 && boostTimer <= 0 && boostsQueued <= 0) {
     goalPendingCount--;
     startGoalGame();
     return;
+  }
+
+  // ⚔️ DUEL: whoever reaches the goal gate first earns the shot; first to 3 goals wins
+  if (gameMode === 'duel' && !raceOver && !goalGame.active) {
+    const rival = bots[0];
+    // gate contest: first to the gate takes the shot
+    if (playerRaceDistM() >= duelGateM) {
+      addPopup('🥅 YOU reach the gate!', W / 2, 110, '#ffd54f');
+      duelGateM += DUEL_GATE_STEP;
+      boostTimer = 0; boostDistLeft = 0; boostsQueued = 0; // the gate stops play NOW
+      startGoalGame();
+      return;
+    } else if (rival && rival.bestClimb >= duelGateM) {
+      // watch him take it — full penalty scene, real keeper physics
+      addPopup('🥅 ' + rival.name + ' reaches the gate…', W / 2, 110, rival.color);
+      startGoalGame('rival');
+    }
   }
 
   // RACE mode: straight racing — first to the target distance wins
@@ -2377,13 +2506,16 @@ function update() {
         for (const q of platforms) {
           if (q !== p && q.y < topY) topY = q.y;
         }
-        const gap = randRange(62, Math.min(MAX_SAFE_GAP, 96 + diff * 48 + lateDifficultyAt(cameraY) * 14));
+        const perRow = 1 + (W - 400) / 380; // target platforms per row for this width
+        const sameRow = W >= 520 && topY !== Infinity && Math.random() < (perRow - 1) / perRow;
+        const gap = sameRow ? randRange(0, 16)
+          : randRange(62, Math.min(MAX_SAFE_GAP, 96 + diff * 48 + lateDifficultyAt(cameraY) * 14));
         p.y = (topY === Infinity) ? -gap : topY - gap;
-        p.w = Math.max(38, PLATFORM_W - diff * 24);
+        p.w = Math.max(33, PLATFORM_W - diff * 24 - lateDifficultyAt(cameraY) * 9);
         p.x = randRange(10, W - p.w - 10);
-        p.moving = Math.random() < (0.2 + diff * 0.35 + lateDifficultyAt(cameraY) * 0.15);
+        p.moving = Math.random() < (0.2 + diff * 0.42 + lateDifficultyAt(cameraY) * 0.2);
         p.dir = Math.random() < 0.5 ? 1 : -1;
-        p.speed = randRange(1 + diff * 1.2, 2 + diff * 2.2) + lateDifficultyAt(cameraY) * 1.0;
+        p.speed = randRange(1 + diff * 1.3, 2 + diff * 2.4) + lateDifficultyAt(cameraY) * 1.3;
       }
     }
     for (const f of flags) {
@@ -2461,8 +2593,8 @@ const RACE_FALL_PENALTY = 60;
 const LIFE_LOSS_PENALTY = 50; // classic: every lost life costs this, fall or storm alike
 
 function handleDeath(reason) {
-  if (gameMode === 'race') {
-    // race rules: endless lives — a fall costs TIME plus the unified points penalty
+  if (racing()) {
+    // race/duel rules: endless lives — a fall costs TIME plus the unified points penalty
     playerFalls++;
     if (score > 0) {
       const penalty = Math.min(score, LIFE_LOSS_PENALTY);
@@ -2748,22 +2880,35 @@ const MTN_LAYERS = [
     L.span = span;
   }
 })();
+let mtnCache = { key: '', sprite: null };
 function drawMountains(t) {
   const drift = cameraY * 0.03;
   const shade = t < 0.5 ? '43,68,102' : '10,14,30';
-  for (const L of MTN_LAYERS) {
-    ctx.fillStyle = 'rgba(' + shade + ',' + L.alpha + ')';
-    ctx.beginPath();
-    ctx.moveTo(0, H);
-    const off = (drift * L.speed) % L.span;
-    for (let x = 0; x <= W; x += MTN_STEP) {
-      const idx = Math.floor(((x + off) % L.span) / MTN_STEP);
-      ctx.lineTo(x, L.table[idx]);
+  // big-canvas perf: repaint the layered ridges only when they visibly shift
+  const key = Math.round(drift / 14) + '|' + shade;
+  if (mtnCache.key !== key) {
+    if (!mtnCache.sprite) {
+      mtnCache.sprite = document.createElement('canvas');
+      mtnCache.sprite.width = W; mtnCache.sprite.height = H;
     }
-    ctx.lineTo(W, H);
-    ctx.closePath();
-    ctx.fill();
+    const mx = mtnCache.sprite.getContext('2d');
+    mx.clearRect(0, 0, W, H);
+    for (const L of MTN_LAYERS) {
+      mx.fillStyle = 'rgba(' + shade + ',' + L.alpha + ')';
+      mx.beginPath();
+      mx.moveTo(0, H);
+      const off = (drift * L.speed) % L.span;
+      for (let x = 0; x <= W; x += MTN_STEP) {
+        const idx = Math.floor(((x + off) % L.span) / MTN_STEP);
+        mx.lineTo(x, L.table[idx]);
+      }
+      mx.lineTo(W, H);
+      mx.closePath();
+      mx.fill();
+    }
+    mtnCache.key = key;
   }
+  ctx.drawImage(mtnCache.sprite, 0, 0);
 }
 
 function drawSunMoon(t) {
@@ -2799,13 +2944,20 @@ function drawSunMoon(t) {
   const moonA = clamp01((t - 0.35) * 2.2);
   if (moonA > 0.02) {
     ctx.globalAlpha = moonA;
-    ctx.shadowColor = 'rgba(220,230,255,0.8)';
-    ctx.shadowBlur = 14;
+    if (!drawSunMoon.moonGlow) {
+      const g = ctx.createRadialGradient(cx, cy, 4, cx, cy, 30);
+      g.addColorStop(0, 'rgba(220,230,255,0.75)');
+      g.addColorStop(1, 'rgba(220,230,255,0)');
+      drawSunMoon.moonGlow = g;
+    }
+    ctx.fillStyle = drawSunMoon.moonGlow;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 30, 0, Math.PI*2);
+    ctx.fill();
     ctx.fillStyle = '#e8edf7';
     ctx.beginPath();
     ctx.arc(cx, cy, 12, 0, Math.PI*2);
     ctx.fill();
-    ctx.shadowBlur = 0;
     // crescent bite (sample sky color at that height)
     ctx.fillStyle = skyColorsAt(cameraY).top;
     ctx.beginPath();
@@ -3258,6 +3410,44 @@ function drawDistanceLines() {
     ctx.fillText('⛳ ' + (k * 500) + ' m', 12, py - 7);
     ctx.restore();
   }
+  // --- duel: the GOAL GATE floating in the sky ---
+  if (gameMode === 'duel') {
+    const gy = baseline - (duelGateM * 10 - cameraY);
+    if (gy > -80 && gy < H + 40) {
+      ctx.save();
+      const pulse = 0.55 + Math.sin(Date.now() * 0.005) * 0.25;
+      const gw = Math.min(W * 0.5, 220), gx = W / 2 - gw / 2, gh = 52;
+      // glow field
+      ctx.globalAlpha = pulse * 0.35;
+      ctx.fillStyle = '#ffd54f';
+      ctx.fillRect(gx - 14, gy - gh - 10, gw + 28, gh + 18);
+      ctx.globalAlpha = 1;
+      // posts + crossbar
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(gx - 5, gy - gh, 5, gh);
+      ctx.fillRect(gx + gw, gy - gh, 5, gh);
+      ctx.fillRect(gx - 5, gy - gh - 5, gw + 10, 5);
+      // net
+      ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+      ctx.lineWidth = 1;
+      for (let nx = gx; nx <= gx + gw; nx += 14) {
+        ctx.beginPath(); ctx.moveTo(nx, gy - gh); ctx.lineTo(nx, gy); ctx.stroke();
+      }
+      for (let ny = gy - gh; ny <= gy; ny += 13) {
+        ctx.beginPath(); ctx.moveTo(gx, ny); ctx.lineTo(gx + gw, ny); ctx.stroke();
+      }
+      // label
+      ctx.font = '900 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+      ctx.strokeText('🥅 GOAL GATE — ' + duelGateM + 'm', W / 2, gy - gh - 14);
+      ctx.fillStyle = '#ffd54f';
+      ctx.fillText('🥅 GOAL GATE — ' + duelGateM + 'm', W / 2, gy - gh - 14);
+      ctx.restore();
+    }
+  }
+
   // --- race finish barrier ---
   if (gameMode !== 'race') return;
   const fy = baseline - (raceTarget * 10 - cameraY);
@@ -3287,7 +3477,7 @@ function drawDistanceLines() {
 }
 
 function drawRaceProgress() {
-  if (gameMode !== 'race' || raceCountdown > 0) return;
+  if (!racing() || raceCountdown > 0) return;
   const x = W - 9;
   const top = 150, bottom = H - 130;
   ctx.save();
@@ -3593,7 +3783,7 @@ function drawBall() {
   drawTriondaCharacter(ball.r, ball.facing, ball.spin);
 
   // live rank above the head (🏆 when leading)
-  if (gameMode === 'race' && raceRanks['YOU']) {
+  if (racing() && raceRanks['YOU']) {
     ctx.globalAlpha = 1;
     const rl = rankLabel(raceRanks['YOU']);
     ctx.font = rl === '🏆' ? '14px sans-serif' : '800 11px sans-serif';
@@ -3630,8 +3820,14 @@ function drawTrophy() {
   ctx.save();
   ctx.globalAlpha = fade;
   ctx.translate(tx, ty);
-  ctx.shadowColor = 'rgba(255,215,0,0.9)';
-  ctx.shadowBlur = 14;
+  if (!window.__trophyGlow) {
+    const g = ctx.createRadialGradient(0, 0, 4, 0, 0, 30);
+    g.addColorStop(0, 'rgba(255,215,0,0.55)');
+    g.addColorStop(1, 'rgba(255,215,0,0)');
+    window.__trophyGlow = g;
+  }
+  ctx.fillStyle = window.__trophyGlow;
+  ctx.beginPath(); ctx.arc(0, 0, 30, 0, Math.PI * 2); ctx.fill();
 
   // FIFA World Cup trophy: two figures spiraling upward, holding the globe,
   // on a base ringed with malachite-green bands
@@ -3754,12 +3950,40 @@ function showRealError(err) {
   running = false;
 }
 
+// ---- adaptive resolution: JS is ~1ms/frame; slow machines are raster-bound.
+// If FPS sags, render the world at reduced resolution and let CSS upscale. ----
+let renderScale = 1;
+let perfFrames = 0;
+let perfWindowStart = 0;
+function applyRenderScale(s) {
+  renderScale = s;
+  canvas.width = Math.round(W * s);
+  canvas.height = Math.round(H * s);
+  ctx.setTransform(s, 0, 0, s, 0, 0);
+  skyGradCache = { key: null, grad: null }; // gradients bind to the context state
+  mtnCache = { key: '', sprite: mtnCache.sprite };
+}
+function perfTick(now) {
+  if (renderScale <= 0.72) return;      // already degraded — stop
+  if (!perfWindowStart) { perfWindowStart = now; perfFrames = 0; return; }
+  perfFrames++;
+  const span = now - perfWindowStart;
+  if (span >= 2000) {
+    const fps = perfFrames / (span / 1000);
+    if (fps < 44 && W > 700) applyRenderScale(0.72);      // big pitches: 48% fewer pixels
+    else if (fps < 38) applyRenderScale(0.8);             // small screens struggling too
+    perfWindowStart = now;
+    perfFrames = 0;
+  }
+}
+
 function loop() {
   if (!running) return;
   if (paused) {
     rafId = requestAnimationFrame(loop);
     return;
   }
+  perfTick(performance.now());
   try {
     update();
     draw();
@@ -3767,13 +3991,20 @@ function loop() {
     matchClockEl.textContent = formatMatchTime(Date.now() - matchStartTime);
     hudDistM = Math.max(hudDistM, Math.floor((cameraY + Math.max(0, (H - 100) - ball.y)) / 10));
     distCounterEl.textContent = '📏 ' + hudDistM + 'm';
+    if (gameMode === 'duel' && bots[0]) {
+      document.getElementById('raceGoal').textContent = '⚔️ YOU ' + duelScoreYou + ' — ' + duelScoreRival + ' ' + bots[0].name;
+    }
     // crossing a 500m barrier: celebrate!
     const mile = Math.floor(hudDistM / 500);
     if (mile > lastMilestone) {
       lastMilestone = mile;
       addConfetti(ball.x, ball.y - 30, 45);
-      showReward('⛳ ' + (mile * 500) + 'm!', '#7ce8ff', '124,232,255', '⛳', 'barrier crossed — keep climbing!');
-      playCrowdRoar(0.8, 0.07);
+      // near a race finish the FINAL STRETCH moment owns the screen
+      const nearFinish = gameMode === 'race' && hudDistM > raceTarget - 170;
+      if (!nearFinish) {
+        showReward('⛳ ' + (mile * 500) + 'm!', '#7ce8ff', '124,232,255', '⛳', 'barrier crossed — keep climbing!');
+        playCrowdRoar(0.8, 0.07);
+      }
     }
   } catch (err) {
     showRealError(err);
@@ -3794,6 +4025,42 @@ function startGame() {
   } catch (err) {
     showRealError(err);
   }
+}
+
+function showDuelResult(youWon, rival) {
+  goalGame.active = false;   // cancel any kick still pending behind the result
+  goalPendingCount = 0;
+  document.getElementById('muteBtn').classList.add('show');
+  const rname = rival ? rival.name : 'Rival';
+  raceWins[youWon ? 'YOU' : rname] = (raceWins[youWon ? 'YOU' : rname] || 0) + 1;
+  const elapsedMs = Date.now() - matchStartTime;
+  const winsRows = Object.keys(raceWins).sort(function(a, c) { return raceWins[c] - raceWins[a]; })
+    .map(function(n, i) {
+      return '<div class="wtRow' + (n === 'YOU' ? ' you' : '') + '"><span>' + (i + 1) + '. ' + n + '</span><span>' + raceWins[n] + '</span></div>';
+    }).join('');
+  overlay.innerHTML = `
+    <h1 style="color:${youWon ? '#ffd54f' : '#ff8a8a'}">${youWon ? '🏆 DUEL CHAMPION!' : '💔 DUEL LOST'}</h1>
+    <div style="font-size:34px;font-weight:900;letter-spacing:1px;margin:6px 0 2px;">
+      YOU ${duelScoreYou} — ${duelScoreRival} ${rname}
+    </div>
+    <p style="opacity:0.85">${youWon ? rname + ' never stood a chance' : rname + ' takes the golden duel'}</p>
+    <div class="winsTable"><div class="wtHead"><span>📊 MATCH</span><span></span></div>
+      <div class="wtRow"><span>⏱ Time</span><span>${formatMatchTime(elapsedMs)}</span></div>
+      <div class="wtRow"><span>📏 Distance</span><span>${Math.round(cameraY / 10)}m</span></div>
+      <div class="wtRow"><span>⚽ Score</span><span>${score}</span></div>
+    </div>
+    <div class="winsTable"><div class="wtHead"><span>🏆 SESSION WINS</span><span></span></div>${winsRows}</div>
+    <button id="playAgainBtn">⚔️ Rematch</button>
+    <button id="menuBtn2" class="secondaryBtn">Menu</button>
+  `;
+  overlay.classList.remove('hidden');
+  const btn = document.getElementById('playAgainBtn');
+  btn.addEventListener('click', function() { startGame(); });
+  document.getElementById('menuBtn2').addEventListener('click', function() { backToMenu(); });
+  if (youWon) {
+    playChampionFanfare();
+    for (let i = 0; i < 4; i++) addConfetti(W * (0.2 + 0.2 * i), H * 0.3, 40);
+  } else { playWhistle(true); }
 }
 
 function showRaceResult(playerWon, winnerName, reason) {
@@ -3945,6 +4212,13 @@ function wireMenu() {
     try { localStorage.setItem('jumpyMuted', soundMuted ? '1' : '0'); } catch (e) {}
     renderMute();
     if (!soundMuted) beep({ freq: 660, duration: 0.08, type: 'sine', volume: 0.15 });
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Enter' && e.key !== 'r' && e.key !== 'R') return;
+    const ov = document.getElementById('overlay');
+    if (ov.classList.contains('hidden')) return;
+    const btn = document.getElementById('startBtn') || document.getElementById('playAgainBtn');
+    if (btn) { e.preventDefault(); btn.click(); }
   });
   document.querySelectorAll('.modeChip').forEach(function(chip) {
     // reflect the current mode selection
