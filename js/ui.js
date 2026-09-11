@@ -265,7 +265,6 @@ function spawnRipple(zone, x, y) {
 
 function pressZone(zone, side, clientX, clientY) {
   if (goalGame.active) { kickGoalBall(); return; }
-  if (playerEliminated) return; // spectators don't steer
   zone.classList.add('active');
   if (side === 'left') { keys.left = true; keys.right = false; }
   else { keys.right = true; keys.left = false; }

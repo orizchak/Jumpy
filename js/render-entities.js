@@ -526,7 +526,6 @@ function drawTriondaCharacter(r, facing, spin) {
 }
 
 function drawBall() {
-  if (playerEliminated) return;
   ctx.save();
   ctx.translate(ball.x, ball.y);
   const squash = Math.min(1.25, Math.max(0.8, 1 - ball.vy * 0.01));

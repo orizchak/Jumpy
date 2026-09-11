@@ -86,7 +86,7 @@ function update() {
   // Storm creeps upward on its own; climbing fast pushes it back down (via the camera-shift below).
   // Stalling lets it catch up — adds real time pressure on top of "don't fall".
   const stormDiff = difficultyAt(cameraY);
-  const stormSpeed = 0.35 + stormDiff * 1.5 + lateDifficultyAt(cameraY) * 0.7;
+  const stormSpeed = 0.25 + stormDiff * 1.1 + lateDifficultyAt(cameraY) * 0.5;
   stormY -= stormSpeed;
 
   const stormGap = stormY - ball.y;
@@ -109,6 +109,7 @@ function update() {
         p.dip = 5; // squash animation on impact
         addSparkle(ball.x, ball.y + ball.r);
         playJumpSound();
+        break; // only ever bounce off one platform per frame
       }
     }
   }
@@ -206,7 +207,7 @@ function update() {
   if (trophyTimer > 0) trophyTimer--;
 
   // GOLDEN GOAL trigger: earned via 10 same flags, fired when safe (not mid-rocket)
-  if (running && !paused && !playerEliminated && goalPendingCount > 0 && boostTimer <= 0 && boostsQueued <= 0) {
+  if (running && !paused && goalPendingCount > 0 && boostTimer <= 0 && boostsQueued <= 0) {
     goalPendingCount--;
     startGoalGame();
     return;
@@ -413,16 +414,9 @@ function update() {
 
   if (reviveGraceTimer > 0) reviveGraceTimer--;
 
-  // spectator mode: the eliminated player's ball sits parked off-stage
-  if (playerEliminated) {
-    ball.x = -999; ball.y = H * 0.92; ball.vy = 0; ball.vx = 0;
-  }
-
   // height-based score floor, evaluated every frame (same baseline as the bots)
-  if (!playerEliminated) {
-    const inScreenClimb = Math.max(0, (H - 100) - ball.y);
-    score = Math.max(score, heightPointsFromPx(cameraY + inScreenClimb) - scorePenalty);
-  }
+  const inScreenClimb = Math.max(0, (H - 100) - ball.y);
+  score = Math.max(score, heightPointsFromPx(cameraY + inScreenClimb) - scorePenalty);
   scoreEl.textContent = score;
   if (score > best) { best = score; bestEl.textContent = best; }
 
@@ -434,6 +428,5 @@ function update() {
 }
 
 let playerFalls = 0;
-let playerEliminated = false; // legacy flag, always false under endless-lives race rules
 const LIFE_LOSS_PENALTY = 50; // classic: every lost life costs this, fall or storm alike
 

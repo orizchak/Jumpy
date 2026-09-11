@@ -11,13 +11,13 @@ function heightPointsFromPx(px) {
 let scorePenalty = 0; // accumulated race fall penalties (keeps the height floor honest)
 
 function difficultyAt(heightClimbed) {
-  return clamp01(heightClimbed / 3800);
+  return clamp01(heightClimbed / 6500);
 }
 
 // A gentle second difficulty slope that keeps the very high altitudes
-// challenging after the main ramp caps out at 4500
+// challenging after the main ramp caps out at 6500
 function lateDifficultyAt(heightClimbed) {
-  return clamp01((heightClimbed - 4500) / 6000);
+  return clamp01((heightClimbed - 6500) / 8000);
 }
 
 function roundRectPath(ctx, x, y, w, h, r) {
@@ -149,9 +149,9 @@ function randomUnlockedFlagIndex(h) {
 function platformStatsAt(diff, climbed) {
   const late = lateDifficultyAt(climbed);
   return {
-    w: Math.max(33, PLATFORM_W - diff * 24 - late * 9),
-    movingChance: 0.2 + diff * 0.42 + late * 0.2,
-    speed: randRange(1 + diff * 1.3, 2 + diff * 2.4) + late * 1.3
+    w: Math.max(38, PLATFORM_W - diff * 20 - late * 7),
+    movingChance: 0.15 + diff * 0.32 + late * 0.15,
+    speed: randRange(1 + diff * 1.0, 2 + diff * 1.8) + late * 1.0
   };
 }
 
@@ -202,7 +202,6 @@ function resetGame() {
   hudDistM = 0;
   lastMilestone = 0;
   distCounterEl.textContent = '📏 0m';
-  playerEliminated = false;
   shuffleFlagOrder();
   goalPendingCount = 0;
   goalGame = { active: false };
