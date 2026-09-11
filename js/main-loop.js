@@ -36,34 +36,38 @@ function showRealError(err) {
 // ================================================================
 // MAIN LOOP — fixed-timestep simulation, render pass
 // ================================================================
-// NATIVE-RATE stepping, exactly like the game was always tuned: one update per
-// display frame on any healthy screen (60Hz, 120Hz ProMotion, 144Hz — the
-// original feel on each device). Only when a machine genuinely drops frames
-// (frame gap > ~22ms) do we run catch-up ticks so the world never goes
-// slow-motion. Healthy devices are byte-for-byte the classic loop.
+// All game constants (GRAVITY, MOVE_SPEED, BOUNCE_VELOCITY, storm speed, ...)
+// are tuned per PHYSICS STEP, not per display frame. So physics must always
+// advance at a fixed 60 steps/second no matter the screen's refresh rate —
+// an accumulator banks real elapsed time and drains it in fixed SIM_STEP
+// chunks. Without this, the game would visibly run faster on 90/120/144Hz
+// displays (2x speed on a 120Hz screen) since requestAnimationFrame fires
+// once per display refresh, not once per 60Hz tick.
 const SIM_STEP = 1000 / 60;
 let simLast = 0;
+let simAccumulator = 0;
 
 function loop(ts) {
   if (!running) return;
   if (paused) {
     simLast = 0; // don't count paused time
+    simAccumulator = 0;
     rafId = requestAnimationFrame(loop);
     return;
   }
   if (!ts) ts = performance.now();
-  const dt = simLast ? Math.min(100, ts - simLast) : SIM_STEP;
+  const dt = simLast ? Math.min(250, ts - simLast) : SIM_STEP;
   simLast = ts;
+  simAccumulator += dt;
   try {
-    if (dt <= 22) {
-      update(); // healthy frame rate: the original one-update-per-frame feel
-    } else {
-      // struggling machine: catch up (max 3) so game speed stays real-time
-      let ticks = Math.min(3, Math.round(dt / SIM_STEP));
-      while (ticks-- > 0) {
-        update();
-        if (!running || paused) break;
-      }
+    // drain banked time in fixed 60Hz steps; cap so a stalled tab can't
+    // spiral into a huge catch-up burst once it regains focus
+    let steps = 0;
+    while (simAccumulator >= SIM_STEP && steps < 5) {
+      update();
+      simAccumulator -= SIM_STEP;
+      steps++;
+      if (!running || paused) break;
     }
     if (!running) return;
     draw();
