@@ -65,6 +65,10 @@ const GRAVITY = 0.28;
 const BOUNCE_VELOCITY = -10.5;
 // wider pitch = proportionally faster travel, so crossing never feels sluggish
 const MOVE_SPEED = 4.5 * (1 + (W - 400) / 400 * 0.5); // 400w: 4.5 -> 1244w: ~9.2
+// how fast horizontal velocity eases toward its target each tick (both on
+// press and release) — a fraction < 1, not an instant snap, so steering
+// doesn't feel twitchy; ~150ms to reach speed
+const STEER_EASE = 0.22;
 const PLATFORM_W = 62, PLATFORM_H = 14;
 const FLAG_R = 10;
 const CANDY_R = 9;

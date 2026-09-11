@@ -37,9 +37,10 @@ function update() {
   if (isMoving && !wasMoving) playMoveSound(keys.left ? 'left' : 'right');
   wasMoving = isMoving;
 
-  if (keys.left) { ball.vx = -MOVE_SPEED; ball.facing = -1; }
-  else if (keys.right) { ball.vx = MOVE_SPEED; ball.facing = 1; }
-  else ball.vx *= 0.85;
+  if (keys.left) ball.facing = -1;
+  else if (keys.right) ball.facing = 1;
+  const targetVx = keys.left ? -MOVE_SPEED : keys.right ? MOVE_SPEED : 0;
+  ball.vx += (targetVx - ball.vx) * STEER_EASE;
 
   ball.x += ball.vx;
   if (ball.x < ball.r) ball.x = ball.r;
