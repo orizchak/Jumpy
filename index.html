@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a2b4a">
+<title>Jumpy</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div id="loader">
+  <div id="loaderBall">⚽</div>
+  <div id="loaderShadow"></div>
+  <div id="loaderTitle">JUMPY</div>
+  <div id="loaderBarTrack"><div id="loaderBar"></div></div>
+</div>
+<div id="wrap">
+  <canvas id="game" width="400" height="600"></canvas>
+  <div id="leftZone" class="touchZone left"><span class="arrowIcon">◀</span></div>
+  <div id="rightZone" class="touchZone right"><span class="arrowIcon">▶</span></div>
+  <div id="stormWarning">⚠ STORM RISING ⚠</div>
+  <div id="rewardBanner">
+    <div id="rewardFlag"></div>
+    <div id="rewardText"></div>
+    <div id="rewardReason"></div>
+  </div>
+  <div id="hud">
+    <div><span class="tag">SCORE</span><span id="score">0</span>
+      <div id="livesDisplay"></div>
+    </div>
+    <div id="matchClock">0:00</div>
+    <div style="text-align:right"><span class="tag">BEST</span><span id="best">0</span>
+      <div id="flagCounter">🚩 0</div>
+    </div>
+  </div>
+  <div id="hudLeft">
+    <div id="distCounter">📏 0m</div>
+    <div id="statusRow">
+      <div id="shieldTag">🛡</div>
+      <div id="multTag">2×</div>
+    </div>
+    <div id="raceBoard"></div>
+  </div>
+  <div id="hudRight">
+    <div id="flagBreakdown"></div>
+  </div>
+  <button id="pauseBtn" title="Pause">⏸</button>
+  <div id="raceGoal"></div>
+  <div id="countdown"></div>
+  <button id="muteBtn" title="Sound on/off">🔊</button>
+  <div id="pauseOverlay">
+    <div id="pauseCard">
+      <h2>PAUSED</h2>
+      <div id="pauseStats"></div>
+      <button id="resumeBtn">RESUME</button>
+      <button id="pauseMenuBtn">Menu</button>
+    </div>
+  </div>
+  <div id="overlay">
+    <div id="menuBadge">⚽ WORLD CUP 2026 EDITION</div>
+    <h1>JUMPY</h1>
+    <p class="menuTagline">Bounce up, don't fall off!</p>
+    <div class="menuCard">
+      <div class="cardTitle">HOW TO PLAY</div>
+      <div class="cardRow"><span>👆</span> Tap left / right side (or arrow keys) to steer</div>
+      <div class="cardRow"><span>🍬</span> Grab candy · 🎁 gifts give a safety shield</div>
+      <div class="cardRow"><span>⛈</span> Outrun the rising storm · ⚽ 3 lives</div>
+    </div>
+    <div class="menuCard">
+      <div class="cardTitle">🚩 FLAG COMBOS</div>
+      <div class="cardRow"><span class="comboNum">3×</span> same flag → <b>+1 LIFE</b></div>
+      <div class="cardRow"><span class="comboNum">5×</span> same flag → <b>🚀 MEGA BOOST</b></div>
+      <div class="cardRow"><span class="comboNum">10×</span> same flag → <b>🥅 GOLDEN GOAL kick</b></div>
+      <div class="cardRow" style="border-top:1px solid rgba(255,255,255,0.14); margin-top:4px; padding-top:5px;"><span class="comboNum">⚡</span> 3 pickups in 3s → <b>HAT-TRICK, 2× score</b></div>
+    </div>
+    <div id="menuStats"></div>
+    <div id="modeSelect">
+      <button class="modeChip selected" data-mode="classic">🏃 CLASSIC<span>endless climb</span></button>
+      <button class="modeChip" data-mode="race">🏁 RACE<span id="raceChipGoal">first to 1000m</span></button>
+      <button class="modeChip" data-mode="duel">⚔️ DUEL<span>first to 3 goals</span></button>
+    </div>
+    <button id="startBtn">KICK OFF</button>
+  </div>
+</div>
+
+
+<script>
+window.addEventListener('error', function(e) {
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#c0392b;color:white;padding:10px;font-family:monospace;font-size:13px;z-index:99999;white-space:pre-wrap;';
+  box.textContent = 'JS Error: ' + e.message + ' (line ' + e.lineno + ', col ' + e.colno + ')';
+  document.body.appendChild(box);
+});
+</script>
+<script src="js/setup.js"></script>
+<script src="js/bots-race.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/world-gen.js"></script>
+<script src="js/goal-game.js"></script>
+<script src="js/update.js"></script>
+<script src="js/death.js"></script>
+<script src="js/render-scene.js"></script>
+<script src="js/render-entities.js"></script>
+<script src="js/main-loop.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
