@@ -350,6 +350,15 @@
     text-align: center;
     border-radius: 8px;
     z-index: 10;
+    /* TEMPORARY DEBUG: menu content is taller than one screen with the
+       diagnostic panel added, and every screenshot sent so far has been
+       cropped at a different point before reaching the true bottom edge.
+       Letting the menu scroll (see also the touchmove listener in index.html)
+       is the easiest way to actually see and screenshot the real bottom.
+       Remove overflow-y/-webkit-overflow-scrolling once the gap is found. */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px 0;
   }
   #overlay.hidden { display: none; }
   #overlay h1 {

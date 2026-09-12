@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a2b4a">
 <title>Jumpy</title>
-<link rel="stylesheet" href="css/styles.css?v=1.0.6">
+<link rel="stylesheet" href="css/styles.css?v=1.0.7">
 </head>
 <body>
 <div id="loader">
@@ -87,7 +87,7 @@
     <div id="skinSelect"></div>
     <div id="skinHint"></div>
     <button id="startBtn">KICK OFF</button>
-    <div id="versionTag">v1.0.6</div>
+    <div id="versionTag">v1.0.7</div>
   </div>
   <pre id="debugInfo"></pre>
 </div>
@@ -119,9 +119,13 @@ window.addEventListener('error', function(e) {
 // Belt-and-suspenders against iOS WKWebView's page-level rubber-band bounce
 // (the CSS overflow/position locks above handle most of it, but a stray
 // touchmove can still nudge the outer document): swallow every touchmove
-// that isn't a pinch gesture, document-wide.
+// that isn't a pinch gesture, document-wide — EXCEPT inside #overlay, which
+// is TEMPORARILY scrollable (see styles.css) so the menu's true bottom edge
+// can actually be seen/screenshotted while tracking down the standalone-mode
+// gap. Restore the plain always-preventDefault version once that's resolved.
 document.addEventListener('touchmove', function(e) {
   if (e.touches.length > 1) return; // don't block pinch-zoom gestures
+  if (e.target.closest && e.target.closest('#overlay')) return; // let the menu scroll
   e.preventDefault();
 }, { passive: false });
 
@@ -165,20 +169,20 @@ if (window.visualViewport) window.visualViewport.addEventListener('resize', upda
 setTimeout(updateDebugInfo, 1500); // catch the state after the boot sequence settles
 setInterval(updateDebugInfo, 500); // keep it live during gameplay too, not just at load
 </script>
-<script src="js/setup.js?v=1.0.6"></script>
-<script src="js/bots-race.js?v=1.0.6"></script>
-<script src="js/audio.js?v=1.0.6"></script>
-<script src="js/persist.js?v=1.0.6"></script>
-<script src="js/daily.js?v=1.0.6"></script>
-<script src="js/achievements.js?v=1.0.6"></script>
-<script src="js/cosmetics.js?v=1.0.6"></script>
-<script src="js/world-gen.js?v=1.0.6"></script>
-<script src="js/goal-game.js?v=1.0.6"></script>
-<script src="js/update.js?v=1.0.6"></script>
-<script src="js/death.js?v=1.0.6"></script>
-<script src="js/render-scene.js?v=1.0.6"></script>
-<script src="js/render-entities.js?v=1.0.6"></script>
-<script src="js/main-loop.js?v=1.0.6"></script>
-<script src="js/ui.js?v=1.0.6"></script>
+<script src="js/setup.js?v=1.0.7"></script>
+<script src="js/bots-race.js?v=1.0.7"></script>
+<script src="js/audio.js?v=1.0.7"></script>
+<script src="js/persist.js?v=1.0.7"></script>
+<script src="js/daily.js?v=1.0.7"></script>
+<script src="js/achievements.js?v=1.0.7"></script>
+<script src="js/cosmetics.js?v=1.0.7"></script>
+<script src="js/world-gen.js?v=1.0.7"></script>
+<script src="js/goal-game.js?v=1.0.7"></script>
+<script src="js/update.js?v=1.0.7"></script>
+<script src="js/death.js?v=1.0.7"></script>
+<script src="js/render-scene.js?v=1.0.7"></script>
+<script src="js/render-entities.js?v=1.0.7"></script>
+<script src="js/main-loop.js?v=1.0.7"></script>
+<script src="js/ui.js?v=1.0.7"></script>
 </body>
 </html>
