@@ -139,6 +139,7 @@ function update() {
       // Collecting 3 flags of the same country earns an extra life
       if (flagCountsByCountry[f.countryIdx] % 3 === 0 && lives < MAX_LIVES) {
         lives++;
+        peakLives = Math.max(peakLives, lives);
         renderLives();
         const nation = FLAG_NATIONS[f.countryIdx] || FLAG_NATIONS[0];
         addConfetti(f.x, f.y, 20);

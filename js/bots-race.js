@@ -419,11 +419,14 @@ const livesDisplayEl = document.getElementById('livesDisplay');
 const flagCounterEl = document.getElementById('flagCounter');
 function renderLives() {
   if (racing()) {
-    livesDisplay.innerHTML = '⚽ ∞';
+    livesDisplayEl.innerHTML = '⚽ ∞';
     return;
   }
+  // Slot count tracks the highest life total reached this run (not just the
+  // current one), so losing a bonus life earned above the starting 3 fades a
+  // ball out instead of just silently shrinking the row.
   let html = '';
-  for (let i = 0; i < Math.max(lives, 3); i++) {
+  for (let i = 0; i < Math.max(peakLives, 3); i++) {
     html += i < lives ? '⚽' : '<span class="lostLife">⚽</span>';
   }
   livesDisplayEl.innerHTML = html;

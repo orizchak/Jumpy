@@ -230,6 +230,7 @@ function resetGame() {
   pauseOverlayEl.classList.remove('show');
   matchStartTime = Date.now();
   lives = 3;
+  peakLives = 3;
   flagsCollectedCount = 0;
   flagCountsByCountry = {};
   reviveGraceTimer = 0;

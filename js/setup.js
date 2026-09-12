@@ -247,6 +247,7 @@ let trophyTimer = 0; // frames remaining to show the floating trophy
 // --- Lives & flag collection tracking ---
 const MAX_LIVES = 5;
 let lives = 3;
+let peakLives = 3; // highest `lives` has reached this run — see renderLives()
 let flagsCollectedCount = 0;
 let flagCountsByCountry = {}; // countryIdx -> count; every 3 of the same country = +1 life
 let reviveGraceTimer = 0;     // brief invulnerable window after a revive
