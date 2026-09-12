@@ -277,6 +277,7 @@ function update() {
     multiplierTimer--;
     if (multiplierTimer <= 0) {
       scoreMultiplier = 1;
+      comboTier = 0;
       multTagEl.classList.remove('show');
       playShieldExpireSound();
     }

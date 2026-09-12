@@ -372,28 +372,43 @@ function showReward(text, cssColor, flashRgb, flagEmoji, reason) {
   }, delay);
 }
 
-// --- HAT-TRICK reward: collect 3 items within 3 seconds -> 2x score for 10 seconds ---
+// --- HAT-TRICK reward: collect 3 items within 3 seconds -> escalating multiplier ---
+// Chaining another hat-trick before the timer expires steps up a tier instead of
+// resetting to 2x, so a sustained pickup streak keeps escalating in reward and juice.
 const HAT_TRICK_WINDOW_MS = 3000;
-const MULTIPLIER_DURATION = 600; // frames (~10s)
+const MULTIPLIER_DURATION = 600; // frames (~10s), refreshed on every tier-up
+const COMBO_TIERS = [
+  { mult: 2, label: 'HAT-TRICK! 2× SCORE',  sub: '⚽ × 3 in 3s' },
+  { mult: 3, label: 'ON FIRE! 3× SCORE',    sub: 'keep the streak alive' },
+  { mult: 4, label: 'UNSTOPPABLE! 4× SCORE', sub: 'nothing can stop you now' },
+  { mult: 5, label: 'LEGENDARY! 5× SCORE',  sub: 'the crowd is chanting your name' }
+];
 let recentPickupTimes = [];
 let scoreMultiplier = 1;
 let multiplierTimer = 0;
+let comboTier = 0; // 0 = no combo active; index+1 into COMBO_TIERS otherwise
 const multTagEl = document.getElementById('multTag');
 
 function registerPickup() {
   const now = Date.now();
   recentPickupTimes.push(now);
   recentPickupTimes = recentPickupTimes.filter(function(t) { return now - t <= HAT_TRICK_WINDOW_MS; });
-  if (recentPickupTimes.length >= 3 && scoreMultiplier === 1) {
+  if (recentPickupTimes.length >= 3) {
     recentPickupTimes = [];
-    scoreMultiplier = 2;
+    comboTier = Math.min(comboTier + 1, COMBO_TIERS.length);
+    const tier = COMBO_TIERS[comboTier - 1];
+    scoreMultiplier = tier.mult;
     multiplierTimer = MULTIPLIER_DURATION;
+    multTagEl.textContent = tier.mult + '×';
     multTagEl.classList.add('show');
-    showReward('HAT-TRICK! 2× SCORE', '#7ce8ff', '64,196,255',
-      '⚽', '⚽ × 3 in 3s');
-    addConfetti(ball.x, ball.y - 20, 24);
+    multTagEl.classList.remove('tierPop');
+    void multTagEl.offsetWidth; // restart the pop animation on every tier-up
+    multTagEl.classList.add('tierPop');
+    showReward(tier.label, '#7ce8ff', '64,196,255', '⚽', tier.sub);
+    addConfetti(ball.x, ball.y - 20, 20 + comboTier * 10);
+    vibrate(comboTier >= 3 ? [20, 20, 20] : 20);
     playAirHorn(false);
-    playCrowdRoar(1.0, 0.09);
+    playCrowdRoar(1.0 + comboTier * 0.15, 0.09);
   }
 }
 const matchClockEl = document.getElementById('matchClock');

@@ -248,6 +248,7 @@ function resetGame() {
   recentPickupTimes = [];
   scoreMultiplier = 1;
   multiplierTimer = 0;
+  comboTier = 0;
   multTagEl.classList.remove('show');
   rewardBannerEl.classList.remove('show');
   popups = [];
