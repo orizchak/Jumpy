@@ -158,9 +158,11 @@ function buildNearMissLine(distM) {
 }
 
 function buildScoreCardText(distM, elapsed) {
-  return '⚽ JUMPY — Score ' + score + ' (best ' + Math.max(best, score) + ')\n' +
-    '📏 ' + distM + 'm climbed · ⏱ ' + elapsed + ' · 🚩 ' + flagsCollectedCount + ' flags\n' +
-    'Play: https://orizchak.github.io/Jumpy/index.html';
+  const lines = '⚽ JUMPY — Score ' + score + ' (best ' + Math.max(best, score) + ')\n' +
+    '📏 ' + distM + 'm climbed · ⏱ ' + elapsed + ' · 🚩 ' + flagsCollectedCount + ' flags\n';
+  return currentRunSeed
+    ? lines + '🔗 Beat me on the exact same course: ' + buildChallengeUrl(currentRunSeed, score)
+    : lines + 'Play: https://orizchak.github.io/Jumpy/index.html';
 }
 
 async function shareScoreCard(text, btn) {
@@ -207,6 +209,11 @@ function showGameOver() {
   const distM = Math.round(cameraY / 10);
   const newHeightRecord = distM > bestHeight;
   const nearMissLine = newHeightRecord ? '' : buildNearMissLine(distM);
+  const challengeLine = gameMode === 'challenge'
+    ? (score > challenge.targetScore
+        ? '<p class="nearMiss" style="color:#69f0ae !important;">🎉 Challenge beaten by ' + (score - challenge.targetScore) + '!</p>'
+        : '<p class="nearMiss">😤 ' + (challenge.targetScore - score) + ' short of beating the challenge</p>')
+    : '';
   if (newHeightRecord) bestHeight = distM;
   if (score > best) best = score;
   totalDistanceClimbed += distM;
@@ -228,7 +235,7 @@ function showGameOver() {
     <p>Distance: <b>${distM}m</b> &nbsp;(best ${bestHeight}m)${newHeightRecord ? ' 🏆' : ''}</p>
     <p>Time: <b>${elapsed}</b> &nbsp;(best ${formatMatchTime(bestTimeMs)})${newTimeRecord ? ' 🏆' : ''}</p>
     <p>🚩 ${flagsCollectedCount} flags collected</p>
-    ${nearMissLine}
+    ${gameMode === 'challenge' ? challengeLine : nearMissLine}
     <button id="playAgainBtn">Play Again</button>
     <button id="shareBtn" class="secondaryBtn">📋 Share</button>
     <button id="menuBtn" class="secondaryBtn">Menu</button>
@@ -275,6 +282,7 @@ function wireMenu() {
   sBtn.addEventListener('click', function() {
     try { sBtn.disabled = true; startGame(); } catch (err) { showRealError(err); }
   });
+  renderChallengeChip();
   const goalEl = document.getElementById('raceChipGoal');
   if (goalEl) goalEl.textContent = 'first to ' + raceTarget + 'm';
   renderMenuStats();

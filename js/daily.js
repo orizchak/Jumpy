@@ -26,8 +26,21 @@ function todayKey() {
 // Math.random, so swapping it wholesale gives a fully reproducible run
 // without touching any of the generation code.
 const _nativeRandom = Math.random.bind(Math);
+
+// The seed actually driving the CURRENT run: fixed per calendar day for
+// DAILY, fixed to the shared link's seed for CHALLENGE (so retries face the
+// identical course), and freshly randomized for every CLASSIC run — kept
+// around so a share afterwards can snapshot exactly that layout into a
+// challenge link (see challenge.js) without making ordinary runs
+// deterministic to begin with. Race/duel play against live bots and stay
+// unseeded.
+let currentRunSeed = null;
 function applyDailySeedIfNeeded() {
-  Math.random = (gameMode === 'daily') ? mulberry32(hashSeed(todayKey())) : _nativeRandom;
+  if (gameMode === 'daily') currentRunSeed = todayKey();
+  else if (gameMode === 'challenge' && challenge) currentRunSeed = challenge.seed;
+  else if (gameMode === 'classic') currentRunSeed = Date.now().toString(36) + Math.floor(_nativeRandom() * 1e9).toString(36);
+  else currentRunSeed = null;
+  Math.random = currentRunSeed ? mulberry32(hashSeed(currentRunSeed)) : _nativeRandom;
 }
 
 // --- Daily login streak: counts consecutive calendar days the game was opened ---

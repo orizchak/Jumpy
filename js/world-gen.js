@@ -213,11 +213,13 @@ function resetGame() {
   boostDistLeft = 0;
   simLast = 0; // fresh clock for the loop
   raceCountdown = racing() ? 230 : 0; // goal message, then 3…2…1…GO!
-  document.getElementById('raceGoal').style.display = (racing() || gameMode === 'daily') ? 'block' : 'none';
+  document.getElementById('raceGoal').style.display = (racing() || gameMode === 'daily' || gameMode === 'challenge') ? 'block' : 'none';
   document.getElementById('raceGoal').textContent = gameMode === 'duel'
     ? '⚔️ FIRST TO ' + DUEL_GOALS_TO_WIN + ' GOALS'
     : gameMode === 'daily'
     ? '📅 DAILY — today\'s best ' + getDailyBest()
+    : gameMode === 'challenge'
+    ? '🔗 CHALLENGE — beat ' + challenge.targetScore
     : '🎯 FIRST TO ' + raceTarget + 'm';
   prevLeaderName = '';
   leadChangeCooldown = 0;
