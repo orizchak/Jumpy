@@ -5,10 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- "black-translucent" lets content paint under the status bar, but it's the
+     specific standalone-mode config with WebKit's long-documented unreliable
+     safe-area-inset reporting (confirmed: regular browser tabs never show
+     the bottom gap, only the standalone Home Screen launch does — this meta
+     tag is the one thing that differs between those two contexts). "black"
+     gives an opaque status bar that iOS reserves properly on its own, with
+     a normal/predictable viewport and no safe-area compensation needed. --><meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#1a2b4a">
 <title>Jumpy</title>
-<link rel="stylesheet" href="css/styles.css?v=1.1.0">
+<link rel="stylesheet" href="css/styles.css?v=1.1.1">
 </head>
 <body>
 <div id="loader">
@@ -87,7 +93,7 @@
     <div id="skinSelect"></div>
     <div id="skinHint"></div>
     <button id="startBtn">KICK OFF</button>
-    <div id="versionTag">v1.1.0</div>
+    <div id="versionTag">v1.1.1</div>
   </div>
 </div>
 
@@ -124,20 +130,20 @@ document.addEventListener('touchmove', function(e) {
   e.preventDefault();
 }, { passive: false });
 </script>
-<script src="js/setup.js?v=1.1.0"></script>
-<script src="js/bots-race.js?v=1.1.0"></script>
-<script src="js/audio.js?v=1.1.0"></script>
-<script src="js/persist.js?v=1.1.0"></script>
-<script src="js/daily.js?v=1.1.0"></script>
-<script src="js/achievements.js?v=1.1.0"></script>
-<script src="js/cosmetics.js?v=1.1.0"></script>
-<script src="js/world-gen.js?v=1.1.0"></script>
-<script src="js/goal-game.js?v=1.1.0"></script>
-<script src="js/update.js?v=1.1.0"></script>
-<script src="js/death.js?v=1.1.0"></script>
-<script src="js/render-scene.js?v=1.1.0"></script>
-<script src="js/render-entities.js?v=1.1.0"></script>
-<script src="js/main-loop.js?v=1.1.0"></script>
-<script src="js/ui.js?v=1.1.0"></script>
+<script src="js/setup.js?v=1.1.1"></script>
+<script src="js/bots-race.js?v=1.1.1"></script>
+<script src="js/audio.js?v=1.1.1"></script>
+<script src="js/persist.js?v=1.1.1"></script>
+<script src="js/daily.js?v=1.1.1"></script>
+<script src="js/achievements.js?v=1.1.1"></script>
+<script src="js/cosmetics.js?v=1.1.1"></script>
+<script src="js/world-gen.js?v=1.1.1"></script>
+<script src="js/goal-game.js?v=1.1.1"></script>
+<script src="js/update.js?v=1.1.1"></script>
+<script src="js/death.js?v=1.1.1"></script>
+<script src="js/render-scene.js?v=1.1.1"></script>
+<script src="js/render-entities.js?v=1.1.1"></script>
+<script src="js/main-loop.js?v=1.1.1"></script>
+<script src="js/ui.js?v=1.1.1"></script>
 </body>
 </html>
