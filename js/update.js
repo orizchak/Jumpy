@@ -429,6 +429,10 @@ function update() {
   scoreEl.textContent = score;
   if (score > best) { best = score; bestEl.textContent = best; }
   checkAchievements();
+  // Re-synced every frame (like scoreEl above) rather than only from the
+  // handful of call sites that change `lives` — belt-and-suspenders so the
+  // HUD can never drift from the real life count no matter what touches it.
+  renderLives();
 
   if (ball.y - ball.r > H + 40) {
     handleDeath('fall');

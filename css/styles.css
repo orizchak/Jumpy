@@ -277,10 +277,12 @@
     filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4));
   }
   #livesDisplay .lostLife {
-    display: inline-block;
-    opacity: 0.3;
-    filter: grayscale(1);
-    transform: scale(0.82);
+    /* Plain opacity only — no filter/transform here: #livesDisplay's parent
+       already carries a drop-shadow filter, and stacking a second filter on
+       these spans (which get replaced via innerHTML on every life change)
+       risked WebKit not repainting them promptly, which read as "the life
+       counter doesn't update" even though the underlying state was correct. */
+    opacity: 0.15;
   }
   #flagCounter {
     font-size: 11px;
