@@ -410,7 +410,7 @@ function drawBallTrail() {
     const bt = ballTrail[i];
     const frac = (i + 1) / ballTrail.length;
     ctx.globalAlpha = frac * (boosted ? 0.34 : 0.16);
-    ctx.fillStyle = boosted ? '#ffd54f' : '#ffffff';
+    ctx.fillStyle = boosted ? '#ffd54f' : currentSkin().trail;
     ctx.beginPath();
     ctx.arc(bt.x, bt.y, ball.r * (0.45 + frac * (boosted ? 0.62 : 0.4)), 0, Math.PI*2);
     ctx.fill();
@@ -439,14 +439,15 @@ function drawVignette() {
 function drawTriondaCharacter(r, facing, spin) {
   // World Cup 2026 "Trionda"-style skin: white base with three curved
   // triangular panels in the host nations' red, blue, and green, plus gold accents
+  const skin = currentSkin();
   if (!drawTriondaCharacter.gcache) drawTriondaCharacter.gcache = {};
-  const gkey = Math.round(r * 2);
+  const gkey = skin.id + ':' + Math.round(r * 2);
   let g = drawTriondaCharacter.gcache[gkey];
   if (!g) {
     g = ctx.createRadialGradient(-r*0.35, -r*0.4, 2, 0, 0, r*1.3);
-    g.addColorStop(0, '#ffffff');
-    g.addColorStop(0.75, '#f4f4f4');
-    g.addColorStop(1, '#dcdcdc');
+    g.addColorStop(0, skin.base[0]);
+    g.addColorStop(0.75, skin.base[1]);
+    g.addColorStop(1, skin.base[2]);
     drawTriondaCharacter.gcache[gkey] = g;
   }
   ctx.beginPath();
@@ -460,8 +461,8 @@ function drawTriondaCharacter(r, facing, spin) {
   ctx.clip();
   if (spin) ctx.rotate(spin); // panels spin with movement; the face stays upright
 
-  // three swooping panels rotated 120° apart (red = USA, green = Mexico, blue = Canada/USA)
-  const panelColors = ['#d5281b', '#0a7a3d', '#1f4e9c'];
+  // three swooping panels rotated 120° apart, colored per the selected skin
+  const panelColors = skin.panelColors;
   for (let i = 0; i < 3; i++) {
     const a = i * (Math.PI * 2 / 3) + Math.PI / 6;
     ctx.save();

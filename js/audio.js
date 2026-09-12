@@ -5,6 +5,11 @@
 let audioCtx = null;
 let soundMuted = false;
 try { soundMuted = localStorage.getItem('jumpyMuted') === '1'; } catch (e) {}
+
+// Short buzz on jump/boost/death for touch devices; a no-op where unsupported.
+function vibrate(pattern) {
+  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}
+}
 function ensureAudio() {
   try {
     if (!audioCtx) {

@@ -186,6 +186,10 @@ function spawnPlatform(y, diff, climbed) {
 }
 
 function resetGame() {
+  applyDailySeedIfNeeded();
+  totalRuns++;
+  shieldUsedThisRun = false;
+  saveStats();
   ball.x = W/2; ball.y = H - 100; ball.vx = 0; ball.vy = BOUNCE_VELOCITY; ball.facing = 1;
   cameraY = 0;
   score = 0;
@@ -209,9 +213,11 @@ function resetGame() {
   boostDistLeft = 0;
   simLast = 0; // fresh clock for the loop
   raceCountdown = racing() ? 230 : 0; // goal message, then 3…2…1…GO!
-  document.getElementById('raceGoal').style.display = racing() ? 'block' : 'none';
+  document.getElementById('raceGoal').style.display = (racing() || gameMode === 'daily') ? 'block' : 'none';
   document.getElementById('raceGoal').textContent = gameMode === 'duel'
     ? '⚔️ FIRST TO ' + DUEL_GOALS_TO_WIN + ' GOALS'
+    : gameMode === 'daily'
+    ? '📅 DAILY — today\'s best ' + getDailyBest()
     : '🎯 FIRST TO ' + raceTarget + 'm';
   prevLeaderName = '';
   leadChangeCooldown = 0;

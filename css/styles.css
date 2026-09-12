@@ -1,13 +1,42 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { height: 100%; overflow: hidden; }
+  /* Both html and body are pinned + non-scrollable: iOS WKWebView (Safari, and
+     every iOS browser incl. Brave, is WKWebView under the hood) will otherwise
+     let the outer document rubber-band/bounce on a touch drag even though body
+     itself has overflow:hidden, which can settle with a blank gap at the
+     bottom of the visible viewport — a well-known WKWebView quirk, not a CSS
+     sizing bug. Locking html too, plus killing touchmove at the document
+     level below, removes the bounce gesture entirely. */
+  html, body {
+    /* -webkit-fill-available is WebKit's own (non-standard) keyword for "the
+       true, full visual viewport" — the exact value that's unreliable via
+       100%/100vh/100dvh specifically in iOS standalone home-screen apps,
+       where a percentage height can resolve short of the real screen and
+       leave a gap at the bottom. Declared after height:100% so it overrides
+       that fallback only where WebKit understands the keyword; unsupported
+       browsers just keep the 100% line before it. Only top/left/width are
+       set (no bottom/right), so height alone determines the box — no
+       over-constraint, unlike using inset:0 together with an explicit height. */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    height: -webkit-fill-available;
+    overflow: hidden;
+    overscroll-behavior: none;
+    /* Installed as a home-screen app, iOS reserves the home-indicator strip at
+       the bottom of the screen and, in that standalone mode, can fall back to
+       its own default (black) fill there instead of the page's background if
+       body's box doesn't extend under it — giving html the same color is a
+       safety net so that strip is never anything but this blue, regardless. */
+    background: #0d1830;
+  }
   body {
     background: linear-gradient(180deg, #0d1830 0%, #1a2b4a 45%, #24395e 100%);
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 100dvh;
     font-family: 'Segoe UI', Tahoma, sans-serif;
-    overflow: hidden;
     touch-action: none;
   }
   #wrap { position: relative; }
@@ -51,8 +80,12 @@
   }
   #muteBtn {
     position: absolute;
-    top: 12px;
-    right: 12px;
+    /* Nudged below the safe area so it clears the status bar / notch/Dynamic
+       Island — these buttons sit inside #wrap, which is itself scaled to fit
+       the screen, so this offset ends up scaled down slightly too; still
+       clears it with plenty of room on every real device. */
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    right: calc(12px + env(safe-area-inset-right, 0px));
     display: none;
     z-index: 40;
     width: 42px;
@@ -65,9 +98,25 @@
   }
   #muteBtn:active { transform: scale(0.92); }
   #muteBtn.show { display: block; }
+  #fullscreenBtn {
+    position: absolute;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    right: calc(62px + env(safe-area-inset-right, 0px));
+    z-index: 40;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.35);
+    background: rgba(0,0,0,0.3);
+    color: #fff;
+    font-size: 17px;
+    cursor: pointer;
+  }
+  #fullscreenBtn:active { transform: scale(0.92); }
+  #fullscreenBtn[hidden] { display: none; }
   #hudLeft {
     position: absolute;
-    top: 44px;
+    top: calc(44px + env(safe-area-inset-top, 0px));
     left: 16px;
     display: flex;
     flex-direction: column;
@@ -78,7 +127,7 @@
   }
   #hudRight {
     position: absolute;
-    top: 44px;
+    top: calc(44px + env(safe-area-inset-top, 0px));
     right: 16px;
     display: flex;
     flex-direction: column;
@@ -123,7 +172,7 @@
   }
   #pauseBtn {
     position: absolute;
-    bottom: 14px;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
     left: 50%;
     transform: translateX(-50%);
     width: 40px;
@@ -436,6 +485,54 @@
     box-shadow: 0 0 10px rgba(64,196,255,0.5);
   }
   #overlay p { font-size: 14px; margin: 5px 0; opacity: 0.85; }
+  .nearMiss { color: #ff8a65 !important; font-weight: 800; font-size: 13px; opacity: 1 !important; }
+  #skinSelect {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .skinChip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding: 6px 10px;
+    font-size: 16px;
+    font-weight: 800;
+    color: rgba(255,255,255,0.8);
+    background: rgba(255,255,255,0.07);
+    border: 1.5px solid rgba(255,255,255,0.2);
+    border-radius: 12px;
+    cursor: pointer;
+  }
+  .skinChip span {
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    opacity: 0.75;
+  }
+  .skinChip.selected {
+    border-color: #ffcc33;
+    box-shadow: 0 0 10px rgba(255,200,60,0.5);
+  }
+  .skinChip.locked { opacity: 0.45; }
+  #skinHint {
+    max-width: 82%;
+    margin: 7px auto 0;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #ffd54f;
+    opacity: 0;
+    min-height: 1px;
+  }
+  #skinHint.show { animation: skinHintFade 3s ease-out forwards; }
+  @keyframes skinHintFade {
+    0% { opacity: 0; transform: translateY(-2px); }
+    10%, 75% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; }
+  }
   .secondaryBtn {
     margin-top: 8px;
     padding: 9px 22px;
@@ -466,6 +563,29 @@
   }
   #startBtn:active, #playAgainBtn:active, #resumeBtn:active { transform: translateY(2px); box-shadow: 0 2px 0 #b56f00; }
   #startBtn:active { box-shadow: 0 2px 0 #0b6b31; }
+  #versionTag {
+    margin-top: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: rgba(255,255,255,0.35);
+  }
+  #debugInfo {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 4px 8px;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 8px;
+    line-height: 1.35;
+    text-align: left;
+    color: #7ce8ff;
+    background: rgba(0,0,0,0.55);
+    white-space: pre-wrap;
+    pointer-events: none;
+    z-index: 999;
+  }
   #menuBtn, #pauseMenuBtn {
     margin-top: 10px;
     padding: 7px 22px;

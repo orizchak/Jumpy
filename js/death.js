@@ -5,6 +5,7 @@ function handleDeath(reason) {
   if (racing()) {
     // race/duel rules: endless lives — a fall costs TIME plus the unified points penalty
     playerFalls++;
+    vibrate(25);
     if (score > 0) {
       const penalty = Math.min(score, LIFE_LOSS_PENALTY);
       score -= penalty;
@@ -29,8 +30,10 @@ function handleDeath(reason) {
     scoreEl.textContent = score;
   }
   if (lives > 0) {
+    vibrate(25);
     revivePlayer();
   } else {
+    vibrate([70, 40, 70]);
     deathReason = reason;
     running = false;
     showGameOver();
@@ -47,6 +50,7 @@ function triggerMegaBoost(nation, count) {
   showReward('🚀 MEGA BOOST!', '#ffd54f', '255,213,79',
     nation.emoji, nation.emoji + ' × ' + count);
   playAirHorn(true);
+  vibrate([25, 25, 25]);
   playCrowdRoar(1.5, 0.12);
 }
 

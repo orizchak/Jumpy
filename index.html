@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a2b4a">
 <title>Jumpy</title>
-<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/styles.css?v=1.0.6">
 </head>
 <body>
 <div id="loader">
@@ -51,6 +51,7 @@
   <div id="raceGoal"></div>
   <div id="countdown"></div>
   <button id="muteBtn" title="Sound on/off">🔊</button>
+  <button id="fullscreenBtn" title="Fullscreen">⛶</button>
   <div id="pauseOverlay">
     <div id="pauseCard">
       <h2>PAUSED</h2>
@@ -81,30 +82,98 @@
       <button class="modeChip selected" data-mode="classic">🏃 CLASSIC<span>endless climb</span></button>
       <button class="modeChip" data-mode="race">🏁 RACE<span id="raceChipGoal">first to 1000m</span></button>
       <button class="modeChip" data-mode="duel">⚔️ DUEL<span>first to 3 goals</span></button>
+      <button class="modeChip" data-mode="daily">📅 DAILY<span id="dailyStreakLabel">today's best 0</span></button>
     </div>
+    <div id="skinSelect"></div>
+    <div id="skinHint"></div>
     <button id="startBtn">KICK OFF</button>
+    <div id="versionTag">v1.0.6</div>
   </div>
+  <pre id="debugInfo"></pre>
 </div>
 
 
 <script>
+// Wallet browser extensions (MetaMask, Brave Wallet, Coinbase Wallet, ...) and other
+// content scripts inject code into every page and sometimes throw while doing it —
+// that has nothing to do with the game, so don't scare players with it. Browsers hide
+// the real details of such cross-origin/extension errors behind the generic message
+// "Script error." with line/col zeroed out; every genuine error from our own same-origin
+// files always carries a real filename and line number, so that opaque shape is itself
+// a reliable signal this isn't ours.
+const THIRD_PARTY_ERROR_PATTERN = /\bethereum\b|\bweb3\b|\bsolana\b/i;
 window.addEventListener('error', function(e) {
+  const isOpaque = e.message === 'Script error.' && !e.filename && !e.lineno;
+  if (isOpaque || THIRD_PARTY_ERROR_PATTERN.test(e.message) || THIRD_PARTY_ERROR_PATTERN.test(e.filename || '')) return;
   const box = document.createElement('div');
   box.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#c0392b;color:white;padding:10px;font-family:monospace;font-size:13px;z-index:99999;white-space:pre-wrap;';
   box.textContent = 'JS Error: ' + e.message + ' (line ' + e.lineno + ', col ' + e.colno + ')';
   document.body.appendChild(box);
 });
+
+// Belt-and-suspenders against iOS WKWebView's page-level rubber-band bounce
+// (the CSS overflow/position locks above handle most of it, but a stray
+// touchmove can still nudge the outer document): swallow every touchmove
+// that isn't a pinch gesture, document-wide.
+document.addEventListener('touchmove', function(e) {
+  if (e.touches.length > 1) return; // don't block pinch-zoom gestures
+  e.preventDefault();
+}, { passive: false });
+
+// TEMPORARY DIAGNOSTIC — a persistent gap has survived three independent,
+// individually-verified CSS fixes, which means the real cause isn't something
+// guessable from here anymore. This prints the actual numbers the device is
+// measuring so the next fix can target the real discrepancy instead of
+// another guess. Safe to remove once the gap is tracked down.
+function readEnvInset(name) {
+  const el = document.createElement('div');
+  el.style.cssText = 'position:fixed;top:0;left:0;width:0;visibility:hidden;height:env(' + name + ', -1px);';
+  document.body.appendChild(el);
+  const val = getComputedStyle(el).height;
+  el.remove();
+  return val;
+}
+function updateDebugInfo() {
+  const el = document.getElementById('debugInfo');
+  if (!el) return;
+  const html = document.documentElement.getBoundingClientRect();
+  const body = document.body.getBoundingClientRect();
+  const wrapEl2 = document.getElementById('wrap');
+  const wrap = wrapEl2 ? wrapEl2.getBoundingClientRect() : null;
+  const canvasEl = document.getElementById('game');
+  const canvasRect = canvasEl ? canvasEl.getBoundingClientRect() : null;
+  const vv = window.visualViewport;
+  el.textContent =
+    'standalone:' + (window.navigator.standalone === true) +
+    ' screen:' + window.screen.width + 'x' + window.screen.height +
+    ' inner:' + window.innerWidth + 'x' + window.innerHeight +
+    ' vv:' + (vv ? (vv.width.toFixed(0) + 'x' + vv.height.toFixed(0)) : 'n/a') + '\n' +
+    'html:' + html.width.toFixed(0) + 'x' + html.height.toFixed(0) +
+    ' body:' + body.width.toFixed(0) + 'x' + body.height.toFixed(0) +
+    (wrap ? ' wrap:' + wrap.width.toFixed(0) + 'x' + wrap.height.toFixed(0) + '@' + wrap.top.toFixed(0) + '-' + wrap.bottom.toFixed(0) : '') + '\n' +
+    (canvasRect ? 'canvas:' + canvasRect.width.toFixed(0) + 'x' + canvasRect.height.toFixed(0) + '@' + canvasRect.top.toFixed(0) + '-' + canvasRect.bottom.toFixed(0) : '') +
+    ' safe T/R/B/L:' + ['top', 'right', 'bottom', 'left'].map(function(s) { return readEnvInset('safe-area-inset-' + s); }).join('/');
+}
+window.addEventListener('load', updateDebugInfo);
+window.addEventListener('resize', updateDebugInfo);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', updateDebugInfo);
+setTimeout(updateDebugInfo, 1500); // catch the state after the boot sequence settles
+setInterval(updateDebugInfo, 500); // keep it live during gameplay too, not just at load
 </script>
-<script src="js/setup.js"></script>
-<script src="js/bots-race.js"></script>
-<script src="js/audio.js"></script>
-<script src="js/world-gen.js"></script>
-<script src="js/goal-game.js"></script>
-<script src="js/update.js"></script>
-<script src="js/death.js"></script>
-<script src="js/render-scene.js"></script>
-<script src="js/render-entities.js"></script>
-<script src="js/main-loop.js"></script>
-<script src="js/ui.js"></script>
+<script src="js/setup.js?v=1.0.6"></script>
+<script src="js/bots-race.js?v=1.0.6"></script>
+<script src="js/audio.js?v=1.0.6"></script>
+<script src="js/persist.js?v=1.0.6"></script>
+<script src="js/daily.js?v=1.0.6"></script>
+<script src="js/achievements.js?v=1.0.6"></script>
+<script src="js/cosmetics.js?v=1.0.6"></script>
+<script src="js/world-gen.js?v=1.0.6"></script>
+<script src="js/goal-game.js?v=1.0.6"></script>
+<script src="js/update.js?v=1.0.6"></script>
+<script src="js/death.js?v=1.0.6"></script>
+<script src="js/render-scene.js?v=1.0.6"></script>
+<script src="js/render-entities.js?v=1.0.6"></script>
+<script src="js/main-loop.js?v=1.0.6"></script>
+<script src="js/ui.js?v=1.0.6"></script>
 </body>
 </html>

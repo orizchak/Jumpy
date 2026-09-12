@@ -1,12 +1,40 @@
 const canvas = document.getElementById('game');
-// The world's logical size adapts to the screen's aspect ratio (once, at load):
-// tall phones get a taller playfield, wide tablets get a WIDER one — no bands
 // ================================================================
 // DISPLAY & CANVAS — logical sizing, HiDPI, viewport fit
 // ================================================================
+// iOS standalone home-screen apps using apple-mobile-web-app-status-bar-style
+// "black-translucent" let page content paint under the status bar, but
+// WKWebView's own window.innerHeight/visualViewport.height still subtract
+// that status-bar height from the reported total instead of counting it —
+// confirmed on-device: a screen of 390x844 with a 47px top safe-area-inset
+// reported an innerHeight of only 797 (844 - 47), even though the content
+// origin still starts at the true y=0. Every purely CSS-driven fill (100%,
+// -webkit-fill-available, position:fixed;inset:0) resolves against that same
+// undersized number, so all of them come up exactly env(safe-area-inset-top)
+// short at the bottom no matter how they're written. Detect standalone mode
+// and add that missing inset back in before using any viewport measurement.
+function readEnvInset(name) {
+  const el = document.createElement('div');
+  el.style.cssText = 'position:fixed;top:0;left:0;width:0;visibility:hidden;height:env(' + name + ', 0px);';
+  document.body.appendChild(el);
+  const px = parseFloat(getComputedStyle(el).height) || 0;
+  el.remove();
+  return px;
+}
+function trueViewportSize() {
+  const vv = window.visualViewport;
+  const w = vv ? vv.width : window.innerWidth;
+  let h = vv ? vv.height : window.innerHeight;
+  if (window.navigator.standalone) h += readEnvInset('safe-area-inset-top');
+  return { w: w, h: h };
+}
+
+// The world's logical size adapts to the screen's aspect ratio (once, at load):
+// tall phones get a taller playfield, wide tablets get a WIDER one — no bands
 (function fitLogicalSize() {
-  const vw = Math.max(300, window.innerWidth);
-  const vh = Math.max(480, window.innerHeight);
+  const vp0 = trueViewportSize();
+  const vw = Math.max(300, vp0.w);
+  const vh = Math.max(480, vp0.h);
   const aspect = vw / vh;
   let w = 400, h = Math.round(400 / aspect);
   if (h < 700) {
@@ -35,17 +63,45 @@ if (DPR !== 1) {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
 
-// Scale the whole game (canvas + HUD overlays together) to fill the viewport
+// Scale the whole game (canvas + HUD overlays together) to fill the viewport.
+// body's own CSS sizing (position:fixed etc., see styles.css) still resolves
+// against the same undersized measurement on iOS standalone, so it's set
+// explicitly here from the corrected trueViewportSize() instead of trusting
+// any percentage/-webkit-fill-available/inset:0 CSS to get it right alone.
+// iOS Safari/Brave also grow or shrink the visible viewport as the address
+// bar collapses/expands, without reliably firing a window 'resize' —
+// window.visualViewport tracks that actually-visible area and fires its own
+// events, so prefer it when present (folded into trueViewportSize()).
 const wrapEl = document.getElementById('wrap');
 function fitWrapToScreen() {
+  const vp = trueViewportSize();
+  // Both html and body must get the corrected height explicitly: html is the
+  // root element, and with its own CSS height (100%/-webkit-fill-available)
+  // still resolving against the same undersized measurement, its overflow:
+  // hidden box was clipping body's own (correctly sized) content down to the
+  // buggy 797px regardless of what body itself was set to.
+  document.documentElement.style.height = vp.h + 'px';
+  document.body.style.height = vp.h + 'px';
   wrapEl.style.width = W + 'px';
   wrapEl.style.height = H + 'px';
-  const s = Math.min(window.innerWidth / W, window.innerHeight / H);
+  // Scale to COVER the viewport, not just fit inside it: the canvas's logical
+  // aspect ratio is chosen to closely match the screen's at load (see
+  // fitLogicalSize above), but it's never pixel-perfect — a scale-to-fit
+  // (Math.min) leaves that tiny leftover sliver as a visible gap on one axis.
+  // Math.max instead over-scales just enough to guarantee full coverage,
+  // symmetrically cropping an imperceptible amount (body's overflow:hidden
+  // plus this element's centered transform-origin keep it centered) rather
+  // than ever leaving blank space.
+  const s = Math.max(vp.w / W, vp.h / H);
   wrapEl.style.transform = 'scale(' + s + ')';
   wrapEl.style.transformOrigin = '50% 50%';
 }
 fitWrapToScreen();
 window.addEventListener('resize', fitWrapToScreen);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', fitWrapToScreen);
+  window.visualViewport.addEventListener('scroll', fitWrapToScreen);
+}
 const scoreEl = document.getElementById('score');
 const bestEl = document.getElementById('best');
 const overlay = document.getElementById('overlay');

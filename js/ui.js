@@ -7,6 +7,10 @@ function showDuelResult(youWon, rival) {
   document.getElementById('muteBtn').classList.add('show');
   const rname = rival ? rival.name : 'Rival';
   raceWins[youWon ? 'YOU' : rname] = (raceWins[youWon ? 'YOU' : rname] || 0) + 1;
+  if (youWon) totalDuelWins++;
+  totalDistanceClimbed += Math.round(cameraY / 10);
+  checkAchievements();
+  saveStats();
   const elapsedMs = Date.now() - matchStartTime;
   const winsRows = Object.keys(raceWins).sort(function(a, c) { return raceWins[c] - raceWins[a]; })
     .map(function(n, i) {
@@ -25,11 +29,17 @@ function showDuelResult(youWon, rival) {
     </div>
     <div class="winsTable"><div class="wtHead"><span>🏆 SESSION WINS</span><span></span></div>${winsRows}</div>
     <button id="playAgainBtn">⚔️ Rematch</button>
+    <button id="shareBtn" class="secondaryBtn">📋 Share</button>
     <button id="menuBtn2" class="secondaryBtn">Menu</button>
   `;
   overlay.classList.remove('hidden');
   const btn = document.getElementById('playAgainBtn');
   btn.addEventListener('click', function() { startGame(); });
+  document.getElementById('shareBtn').addEventListener('click', function() {
+    const text = (youWon ? '🏆 JUMPY DUEL WIN' : '💔 JUMPY DUEL LOSS') + ' — YOU ' + duelScoreYou + ' — ' + duelScoreRival + ' ' + rname + '\n' +
+      'Play: https://orizchak.github.io/Jumpy/index.html';
+    shareScoreCard(text, document.getElementById('shareBtn'));
+  });
   document.getElementById('menuBtn2').addEventListener('click', function() { backToMenu(); });
   if (youWon) {
     playChampionFanfare();
@@ -40,6 +50,10 @@ function showDuelResult(youWon, rival) {
 function showRaceResult(playerWon, winnerName, reason) {
   document.getElementById('muteBtn').classList.add('show');
   raceWins[winnerName] = (raceWins[winnerName] || 0) + 1;
+  if (playerWon) totalRaceWins++;
+  totalDistanceClimbed += playerRaceDistM();
+  checkAchievements();
+  saveStats();
   playWhistle(true);
   stormWarning.classList.remove('show');
   const playerElapsedSec = (Date.now() - matchStartTime) / 1000;
@@ -104,16 +118,80 @@ function showRaceResult(playerWon, winnerName, reason) {
     ${nextGoalLine}
 
     <button id="playAgainBtn">Race Again</button>
-    <button id="menuBtn">Menu</button>
+    <button id="shareBtn" class="secondaryBtn">📋 Share</button>
+    <button id="menuBtn" class="secondaryBtn">Menu</button>
   `;
   const btn = document.getElementById('playAgainBtn');
   btn.addEventListener('click', function() {
     btn.disabled = true;
     startGame();
   });
+  document.getElementById('shareBtn').addEventListener('click', function() {
+    const text = (playerWon ? '🏆 JUMPY RACE WIN' : 'JUMPY RACE') + ' — ' + reason + '\n' +
+      'Play: https://orizchak.github.io/Jumpy/index.html';
+    shareScoreCard(text, document.getElementById('shareBtn'));
+  });
   document.getElementById('menuBtn').addEventListener('click', function() {
     try { backToMenu(); } catch (err) { showRealError(err); }
   });
+}
+
+// "So close!" near-miss messaging: surfaces the smallest gap to a milestone
+// the player just missed, using data already tracked during the run.
+function buildNearMissLine(distM) {
+  if (bestHeight > 0) {
+    const gap = bestHeight - distM;
+    if (gap > 0 && gap <= 30) return '<p class="nearMiss">😤 ' + gap + 'm from your best!</p>';
+  }
+  let bestNeed = Infinity, bestNation = null;
+  for (const idx in flagCountsByCountry) {
+    const c = flagCountsByCountry[idx];
+    const rem = c % 5;
+    if (rem === 0) continue; // already cashed in this combo
+    const need = 5 - rem;
+    if (need < bestNeed) { bestNeed = need; bestNation = FLAG_NATIONS[idx]; }
+  }
+  if (bestNation && bestNeed <= 2) {
+    return '<p class="nearMiss">' + bestNation.emoji + ' ' + bestNeed + ' flag' + (bestNeed > 1 ? 's' : '') + ' from a MEGA BOOST!</p>';
+  }
+  return '';
+}
+
+function buildScoreCardText(distM, elapsed) {
+  return '⚽ JUMPY — Score ' + score + ' (best ' + Math.max(best, score) + ')\n' +
+    '📏 ' + distM + 'm climbed · ⏱ ' + elapsed + ' · 🚩 ' + flagsCollectedCount + ' flags\n' +
+    'Play: https://orizchak.github.io/Jumpy/index.html';
+}
+
+async function shareScoreCard(text, btn) {
+  try {
+    if (navigator.share) { await navigator.share({ text: text, title: 'Jumpy' }); return; }
+  } catch (e) { /* cancelled or unsupported — fall through to clipboard */ }
+  const flashCopied = function() {
+    if (!btn) return;
+    const orig = btn.textContent;
+    btn.textContent = '✅ Copied!';
+    setTimeout(function() { btn.textContent = orig; }, 1500);
+  };
+  const flashFailed = function() {
+    if (!btn) return;
+    const orig = btn.textContent;
+    btn.textContent = '⚠️ Copy failed';
+    setTimeout(function() { btn.textContent = orig; }, 1500);
+  };
+  try {
+    await navigator.clipboard.writeText(text);
+    flashCopied();
+    return;
+  } catch (e) { /* fall through to the legacy copy path */ }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    if (ok) flashCopied(); else flashFailed();
+  } catch (e2) { flashFailed(); }
 }
 
 function showGameOver() {
@@ -128,7 +206,14 @@ function showGameOver() {
   const elapsed = formatMatchTime(elapsedMs);
   const distM = Math.round(cameraY / 10);
   const newHeightRecord = distM > bestHeight;
+  const nearMissLine = newHeightRecord ? '' : buildNearMissLine(distM);
   if (newHeightRecord) bestHeight = distM;
+  if (score > best) best = score;
+  totalDistanceClimbed += distM;
+  if (!shieldUsedThisRun) unlockAchievement('no_shield');
+  if (gameMode === 'daily') recordDailyResult(score);
+  checkAchievements();
+  saveStats();
   const standings = raceStandings();
   const place = standings.findIndex(function(e) { return e.you; }) + 1;
   const placeLabel = ['🥇 1st', '🥈 2nd', '🥉 3rd', '4th'][place - 1] || place + 'th';
@@ -143,13 +228,18 @@ function showGameOver() {
     <p>Distance: <b>${distM}m</b> &nbsp;(best ${bestHeight}m)${newHeightRecord ? ' 🏆' : ''}</p>
     <p>Time: <b>${elapsed}</b> &nbsp;(best ${formatMatchTime(bestTimeMs)})${newTimeRecord ? ' 🏆' : ''}</p>
     <p>🚩 ${flagsCollectedCount} flags collected</p>
+    ${nearMissLine}
     <button id="playAgainBtn">Play Again</button>
-    <button id="menuBtn">Menu</button>
+    <button id="shareBtn" class="secondaryBtn">📋 Share</button>
+    <button id="menuBtn" class="secondaryBtn">Menu</button>
   `;
   const btn = document.getElementById('playAgainBtn');
   btn.addEventListener('click', function() {
     btn.disabled = true;
     startGame();
+  });
+  document.getElementById('shareBtn').addEventListener('click', function() {
+    shareScoreCard(buildScoreCardText(distM, elapsed), document.getElementById('shareBtn'));
   });
   document.getElementById('menuBtn').addEventListener('click', function() {
     try { backToMenu(); } catch (err) { showRealError(err); }
@@ -160,6 +250,26 @@ function showGameOver() {
 // innerHTML replacement destroys listeners, so wiring must be re-attachable.
 const MENU_HTML = overlay.innerHTML;
 
+// muteBtn lives outside #overlay, so it (and its listeners) survive every
+// overlay.innerHTML reset — attach its click handler exactly once here rather
+// than inside wireMenu(), which runs again on every menu/backToMenu visit and
+// would otherwise stack a fresh listener each time (a few games in, a single
+// tap fires several stacked toggles — an even count nets to no change at all).
+const muteBtn = document.getElementById('muteBtn');
+function renderMute() { muteBtn.textContent = soundMuted ? '🔇' : '🔊'; }
+muteBtn.addEventListener('click', function() {
+  soundMuted = !soundMuted;
+  try { localStorage.setItem('jumpyMuted', soundMuted ? '1' : '0'); } catch (e) {}
+  renderMute();
+  if (!soundMuted) beep({ freq: 660, duration: 0.08, type: 'sine', volume: 0.15 });
+});
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter' && e.key !== 'r' && e.key !== 'R') return;
+  if (overlay.classList.contains('hidden')) return;
+  const btn = document.getElementById('startBtn') || document.getElementById('playAgainBtn');
+  if (btn) { e.preventDefault(); btn.click(); }
+});
+
 function wireMenu() {
   const sBtn = document.getElementById('startBtn');
   sBtn.addEventListener('click', function() {
@@ -167,6 +277,8 @@ function wireMenu() {
   });
   const goalEl = document.getElementById('raceChipGoal');
   if (goalEl) goalEl.textContent = 'first to ' + raceTarget + 'm';
+  renderMenuStats();
+  renderSkinPicker();
   document.querySelectorAll('.diffChip').forEach(function(chip) {
     chip.classList.toggle('selected', chip.dataset.diff === raceDifficulty);
     chip.addEventListener('click', function() {
@@ -177,23 +289,8 @@ function wireMenu() {
       } catch (err) { showRealError(err); }
     });
   });
-  const muteBtn = document.getElementById('muteBtn');
-  function renderMute() { muteBtn.textContent = soundMuted ? '🔇' : '🔊'; }
   renderMute();
   muteBtn.classList.add('show'); // visible on the opening menu
-  muteBtn.addEventListener('click', function() {
-    soundMuted = !soundMuted;
-    try { localStorage.setItem('jumpyMuted', soundMuted ? '1' : '0'); } catch (e) {}
-    renderMute();
-    if (!soundMuted) beep({ freq: 660, duration: 0.08, type: 'sine', volume: 0.15 });
-  });
-  document.addEventListener('keydown', function(e) {
-    if (e.key !== 'Enter' && e.key !== 'r' && e.key !== 'R') return;
-    const ov = document.getElementById('overlay');
-    if (ov.classList.contains('hidden')) return;
-    const btn = document.getElementById('startBtn') || document.getElementById('playAgainBtn');
-    if (btn) { e.preventDefault(); btn.click(); }
-  });
   document.querySelectorAll('.modeChip').forEach(function(chip) {
     // reflect the current mode selection
     chip.classList.toggle('selected', chip.dataset.mode === gameMode);
@@ -214,6 +311,61 @@ function backToMenu() {
   overlay.classList.remove('hidden');
   wireMenu();
 }
+
+// ================================================================
+// FULLSCREEN — toggle via the Fullscreen API where the browser supports it
+// (notably absent on iOS Safari/Brave for non-video elements, so the
+// button just stays hidden there instead of doing nothing on tap)
+// ================================================================
+(function() {
+  const btn = document.getElementById('fullscreenBtn');
+  const el = document.documentElement;
+  const requestFS = el.requestFullscreen || el.webkitRequestFullscreen;
+  const exitFS = document.exitFullscreen || document.webkitExitFullscreen;
+  if (!requestFS || !exitFS) { btn.hidden = true; return; }
+  function isFullscreen() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+  function syncBtn() {
+    btn.textContent = isFullscreen() ? '⤡' : '⛶';
+    btn.title = isFullscreen() ? 'Exit fullscreen' : 'Fullscreen';
+  }
+  btn.addEventListener('click', function() {
+    try {
+      if (isFullscreen()) exitFS.call(document);
+      else {
+        const p = requestFS.call(el);
+        if (p && p.catch) p.catch(function() {});
+      }
+    } catch (e) { /* blocked or unsupported — nothing more we can do */ }
+  });
+  function onFullscreenChange() {
+    syncBtn();
+    fitWrapToScreen(); // the viewport size just changed; rescale immediately rather than waiting on 'resize'
+  }
+  document.addEventListener('fullscreenchange', onFullscreenChange);
+  document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+  syncBtn();
+})();
+
+// ================================================================
+// HUD VISIBILITY — the live score/distance/race readouts sit at fixed
+// screen positions and stay in the DOM at all times; #overlay (menu/pause/
+// result screens) only draws a translucent backdrop over them rather than
+// truly hiding them, so their text bleeds through and can visually collide
+// with the mute/fullscreen buttons (which sit above the overlay so they stay
+// clickable). Hide the HUD outright whenever a screen is covering it instead.
+(function() {
+  const hudEls = ['hud', 'hudLeft', 'hudRight', 'raceGoal', 'stormWarning']
+    .map(function(id) { return document.getElementById(id); });
+  function syncHudVisibility() {
+    const covered = !overlay.classList.contains('hidden') || pauseOverlayEl.classList.contains('show');
+    hudEls.forEach(function(el) { el.style.visibility = covered ? 'hidden' : ''; });
+  }
+  new MutationObserver(syncHudVisibility).observe(overlay, { attributes: true, attributeFilter: ['class'] });
+  new MutationObserver(syncHudVisibility).observe(pauseOverlayEl, { attributes: true, attributeFilter: ['class'] });
+  syncHudVisibility();
+})();
 
 document.getElementById('pauseBtn').addEventListener('click', function() {
   try { togglePause(); } catch (err) { showRealError(err); }

@@ -55,6 +55,7 @@ function update() {
     addConfetti(ball.x, ball.y, 25);
     addPopup('MEGA BOOST! (' + (2 - boostsQueued + 1) + '/3)', ball.x, ball.y - 40, '#ffd54f');
     playAirHorn(true);
+    vibrate([25, 25, 25]);
   }
   if (boostTimer > 0) {
     boostTimer--;
@@ -110,6 +111,7 @@ function update() {
         p.dip = 5; // squash animation on impact
         addSparkle(ball.x, ball.y + ball.r);
         playJumpSound();
+        vibrate(6);
         break; // only ever bounce off one platform per frame
       }
     }
@@ -127,6 +129,7 @@ function update() {
       const flagPts = 10 * scoreMultiplier;
       score += flagPts;
       flagsCollectedCount++;
+      totalFlagsCollected++;
       renderFlagCounter();
       flagCountsByCountry[f.countryIdx] = (flagCountsByCountry[f.countryIdx] || 0) + 1;
       addSparkle(f.x, f.y);
@@ -184,6 +187,7 @@ function update() {
     if (Math.sqrt(dx*dx + dy*dy) < ball.r + GIFT_R) {
       g.collected = true;
       shieldActive = true;
+      shieldUsedThisRun = true;
       shieldTimer = SHIELD_DURATION;
       addSparkle(g.x, g.y);
       addConfetti(g.x, g.y, 16);
@@ -411,6 +415,7 @@ function update() {
     ball.vy = BOUNCE_VELOCITY * 0.85;
     addSparkle(ball.x, barrierY);
     playJumpSound();
+    vibrate(6);
   }
 
   if (reviveGraceTimer > 0) reviveGraceTimer--;
@@ -420,6 +425,7 @@ function update() {
   score = Math.max(score, heightPointsFromPx(cameraY + inScreenClimb) - scorePenalty);
   scoreEl.textContent = score;
   if (score > best) { best = score; bestEl.textContent = best; }
+  checkAchievements();
 
   if (ball.y - ball.r > H + 40) {
     handleDeath('fall');
