@@ -172,17 +172,17 @@
   }
   #pauseBtn {
     position: absolute;
-    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
     left: 50%;
     transform: translateX(-50%);
-    width: 40px;
-    height: 30px;
-    font-size: 14px;
+    width: 52px;
+    height: 40px;
+    font-size: 18px;
     line-height: 1;
     color: rgba(255,255,255,0.85);
     background: rgba(0,0,0,0.28);
     border: 1px solid rgba(255,255,255,0.25);
-    border-radius: 10px;
+    border-radius: 12px;
     cursor: pointer;
     z-index: 6;
     padding: 0;
@@ -350,15 +350,6 @@
     text-align: center;
     border-radius: 8px;
     z-index: 10;
-    /* TEMPORARY DEBUG: menu content is taller than one screen with the
-       diagnostic panel added, and every screenshot sent so far has been
-       cropped at a different point before reaching the true bottom edge.
-       Letting the menu scroll (see also the touchmove listener in index.html)
-       is the easiest way to actually see and screenshot the real bottom.
-       Remove overflow-y/-webkit-overflow-scrolling once the gap is found. */
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: 12px 0;
   }
   #overlay.hidden { display: none; }
   #overlay h1 {
@@ -585,27 +576,6 @@
     letter-spacing: 0.5px;
     color: rgba(255,255,255,0.35);
   }
-  #debugInfo {
-    /* fixed to the true viewport, NOT #wrap: wrap gets transform-scaled to
-       exceed the viewport (the cover-scale fix), so a child anchored to
-       wrap's own bottom:0 ends up below the visible screen and gets clipped
-       by body's overflow:hidden — this must anchor to the real screen edge
-       instead, unaffected by wrap's internal scaling. */
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    padding: 4px 8px;
-    font-family: 'SF Mono', Menlo, Consolas, monospace;
-    font-size: 8px;
-    line-height: 1.35;
-    text-align: left;
-    color: #7ce8ff;
-    background: rgba(0,0,0,0.55);
-    white-space: pre-wrap;
-    pointer-events: none;
-    z-index: 999;
-  }
   #menuBtn, #pauseMenuBtn {
     margin-top: 10px;
     padding: 7px 22px;
@@ -620,12 +590,12 @@
 
   .touchZone {
     position: absolute;
-    top: 6px; bottom: 6px;
+    top: 6px; bottom: calc(6px + env(safe-area-inset-bottom, 0px));
     width: calc(50% - 6px);
     display: flex;
     align-items: flex-end;
     justify-content: center;
-    padding-bottom: 22px;
+    padding-bottom: 30px;
     background: rgba(255,255,255,0.001);
     transition: background 0.15s ease;
     z-index: 2;
@@ -636,7 +606,7 @@
   .touchZone.right { right: 6px; border-radius: 0 9px 9px 0; }
   .touchZone.active { background: rgba(255,255,255,0.14); }
   .touchZone .arrowIcon {
-    font-size: 38px;
+    font-size: 46px;
     color: rgba(255,255,255,0.4);
     text-shadow: 0 2px 8px rgba(0,0,0,0.35);
     user-select: none;

@@ -75,15 +75,6 @@ if (DPR !== 1) {
 const wrapEl = document.getElementById('wrap');
 function fitWrapToScreen() {
   const vp = trueViewportSize();
-  // TEMPORARY DIAGNOSTIC: record what this function actually computed and how
-  // often it runs, so the on-screen debug panel can show it directly instead
-  // of inferring it from the end result (which doesn't reveal whether the
-  // correct value was ever computed, or was computed then overwritten later).
-  window.__fitDebug = {
-    calls: (window.__fitDebug ? window.__fitDebug.calls : 0) + 1,
-    standalone: window.navigator.standalone,
-    vpW: vp.w, vpH: vp.h
-  };
   // Both html and body must get the corrected height explicitly: html is the
   // root element, and with its own CSS height (100%/-webkit-fill-available)
   // still resolving against the same undersized measurement, its overflow:

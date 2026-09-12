@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a2b4a">
 <title>Jumpy</title>
-<link rel="stylesheet" href="css/styles.css?v=1.0.9">
+<link rel="stylesheet" href="css/styles.css?v=1.1.0">
 </head>
 <body>
 <div id="loader">
@@ -87,10 +87,9 @@
     <div id="skinSelect"></div>
     <div id="skinHint"></div>
     <button id="startBtn">KICK OFF</button>
-    <div id="versionTag">v1.0.9</div>
+    <div id="versionTag">v1.1.0</div>
   </div>
 </div>
-<pre id="debugInfo"></pre>
 
 
 <script>
@@ -119,71 +118,26 @@ window.addEventListener('error', function(e) {
 // Belt-and-suspenders against iOS WKWebView's page-level rubber-band bounce
 // (the CSS overflow/position locks above handle most of it, but a stray
 // touchmove can still nudge the outer document): swallow every touchmove
-// that isn't a pinch gesture, document-wide — EXCEPT inside #overlay, which
-// is TEMPORARILY scrollable (see styles.css) so the menu's true bottom edge
-// can actually be seen/screenshotted while tracking down the standalone-mode
-// gap. Restore the plain always-preventDefault version once that's resolved.
+// that isn't a pinch gesture, document-wide.
 document.addEventListener('touchmove', function(e) {
   if (e.touches.length > 1) return; // don't block pinch-zoom gestures
-  if (e.target.closest && e.target.closest('#overlay')) return; // let the menu scroll
   e.preventDefault();
 }, { passive: false });
-
-// TEMPORARY DIAGNOSTIC — a persistent gap has survived three independent,
-// individually-verified CSS fixes, which means the real cause isn't something
-// guessable from here anymore. This prints the actual numbers the device is
-// measuring so the next fix can target the real discrepancy instead of
-// another guess. Safe to remove once the gap is tracked down.
-function readEnvInset(name) {
-  const el = document.createElement('div');
-  el.style.cssText = 'position:fixed;top:0;left:0;width:0;visibility:hidden;height:env(' + name + ', -1px);';
-  document.body.appendChild(el);
-  const val = getComputedStyle(el).height;
-  el.remove();
-  return val;
-}
-function updateDebugInfo() {
-  const el = document.getElementById('debugInfo');
-  if (!el) return;
-  const html = document.documentElement.getBoundingClientRect();
-  const body = document.body.getBoundingClientRect();
-  const wrapEl2 = document.getElementById('wrap');
-  const wrap = wrapEl2 ? wrapEl2.getBoundingClientRect() : null;
-  const canvasEl = document.getElementById('game');
-  const canvasRect = canvasEl ? canvasEl.getBoundingClientRect() : null;
-  const vv = window.visualViewport;
-  el.textContent =
-    'standalone:' + (window.navigator.standalone === true) +
-    ' screen:' + window.screen.width + 'x' + window.screen.height +
-    ' inner:' + window.innerWidth + 'x' + window.innerHeight +
-    ' vv:' + (vv ? (vv.width.toFixed(0) + 'x' + vv.height.toFixed(0)) : 'n/a') + '\n' +
-    'html:' + html.width.toFixed(0) + 'x' + html.height.toFixed(0) +
-    ' body:' + body.width.toFixed(0) + 'x' + body.height.toFixed(0) +
-    (wrap ? ' wrap:' + wrap.width.toFixed(0) + 'x' + wrap.height.toFixed(0) + '@' + wrap.top.toFixed(0) + '-' + wrap.bottom.toFixed(0) : '') + '\n' +
-    (canvasRect ? 'canvas:' + canvasRect.width.toFixed(0) + 'x' + canvasRect.height.toFixed(0) + '@' + canvasRect.top.toFixed(0) + '-' + canvasRect.bottom.toFixed(0) : '') +
-    ' safe T/R/B/L:' + ['top', 'right', 'bottom', 'left'].map(function(s) { return readEnvInset('safe-area-inset-' + s); }).join('/') + '\n' +
-    'fitDebug:' + (window.__fitDebug ? JSON.stringify(window.__fitDebug) : 'never ran');
-}
-window.addEventListener('load', updateDebugInfo);
-window.addEventListener('resize', updateDebugInfo);
-if (window.visualViewport) window.visualViewport.addEventListener('resize', updateDebugInfo);
-setTimeout(updateDebugInfo, 1500); // catch the state after the boot sequence settles
-setInterval(updateDebugInfo, 500); // keep it live during gameplay too, not just at load
 </script>
-<script src="js/setup.js?v=1.0.9"></script>
-<script src="js/bots-race.js?v=1.0.9"></script>
-<script src="js/audio.js?v=1.0.9"></script>
-<script src="js/persist.js?v=1.0.9"></script>
-<script src="js/daily.js?v=1.0.9"></script>
-<script src="js/achievements.js?v=1.0.9"></script>
-<script src="js/cosmetics.js?v=1.0.9"></script>
-<script src="js/world-gen.js?v=1.0.9"></script>
-<script src="js/goal-game.js?v=1.0.9"></script>
-<script src="js/update.js?v=1.0.9"></script>
-<script src="js/death.js?v=1.0.9"></script>
-<script src="js/render-scene.js?v=1.0.9"></script>
-<script src="js/render-entities.js?v=1.0.9"></script>
-<script src="js/main-loop.js?v=1.0.9"></script>
-<script src="js/ui.js?v=1.0.9"></script>
+<script src="js/setup.js?v=1.1.0"></script>
+<script src="js/bots-race.js?v=1.1.0"></script>
+<script src="js/audio.js?v=1.1.0"></script>
+<script src="js/persist.js?v=1.1.0"></script>
+<script src="js/daily.js?v=1.1.0"></script>
+<script src="js/achievements.js?v=1.1.0"></script>
+<script src="js/cosmetics.js?v=1.1.0"></script>
+<script src="js/world-gen.js?v=1.1.0"></script>
+<script src="js/goal-game.js?v=1.1.0"></script>
+<script src="js/update.js?v=1.1.0"></script>
+<script src="js/death.js?v=1.1.0"></script>
+<script src="js/render-scene.js?v=1.1.0"></script>
+<script src="js/render-entities.js?v=1.1.0"></script>
+<script src="js/main-loop.js?v=1.1.0"></script>
+<script src="js/ui.js?v=1.1.0"></script>
 </body>
 </html>
