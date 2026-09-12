@@ -522,6 +522,12 @@
     letter-spacing: 0.3px;
     opacity: 0.75;
   }
+  .skinChip .skinIcon {
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: normal;
+    opacity: 1;
+  }
   .skinChip.selected {
     border-color: #ffcc33;
     box-shadow: 0 0 10px rgba(255,200,60,0.5);
@@ -580,7 +586,12 @@
     color: rgba(255,255,255,0.35);
   }
   #debugInfo {
-    position: absolute;
+    /* fixed to the true viewport, NOT #wrap: wrap gets transform-scaled to
+       exceed the viewport (the cover-scale fix), so a child anchored to
+       wrap's own bottom:0 ends up below the visible screen and gets clipped
+       by body's overflow:hidden — this must anchor to the real screen edge
+       instead, unaffected by wrap's internal scaling. */
+    position: fixed;
     left: 0;
     right: 0;
     bottom: 0;

@@ -43,7 +43,8 @@ function renderSkinPicker() {
     const cls = 'skinChip' + (s.id === currentSkinId ? ' selected' : '') + (unlocked ? '' : ' locked');
     // Locked chips stay clickable (no [disabled]) so tapping one can explain how to unlock it.
     return '<button class="' + cls + '" data-skin="' + s.id + '">' +
-      s.emoji + '<span>' + (unlocked ? s.name : '🔒 ' + s.name) + '</span></button>';
+      '<span class="skinIcon">' + s.emoji + (unlocked ? '' : ' 🔒') + '</span>' +
+      '<span>' + s.name + '</span></button>';
   }).join('');
   const hintEl = document.getElementById('skinHint');
   if (hintEl) { hintEl.textContent = ''; hintEl.classList.remove('show'); }
