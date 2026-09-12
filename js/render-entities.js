@@ -348,7 +348,11 @@ function drawBots() {
       continue;
     }
     if (!isFiniteNum(b.x) || !isFiniteNum(b.y)) continue;
-    if (b.y < -32 || b.y > H + 20) continue;
+    // Must stay outside the actual ahead/behind transition thresholds (-28 and
+    // H+30 in bots-race.js), not just the visible canvas — a bot whose y falls
+    // between "off-screen" and "flagged ahead/behind" here would render
+    // nothing at all: not the real character, not the ▲/▼ marker either.
+    if (b.y < -32 || b.y > H + 34) continue;
     const facing = b.vx < 0 ? -1 : 1;
     ctx.save();
     ctx.translate(b.x, b.y);
