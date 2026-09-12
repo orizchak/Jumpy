@@ -75,6 +75,15 @@ if (DPR !== 1) {
 const wrapEl = document.getElementById('wrap');
 function fitWrapToScreen() {
   const vp = trueViewportSize();
+  // TEMPORARY DIAGNOSTIC: record what this function actually computed and how
+  // often it runs, so the on-screen debug panel can show it directly instead
+  // of inferring it from the end result (which doesn't reveal whether the
+  // correct value was ever computed, or was computed then overwritten later).
+  window.__fitDebug = {
+    calls: (window.__fitDebug ? window.__fitDebug.calls : 0) + 1,
+    standalone: window.navigator.standalone,
+    vpW: vp.w, vpH: vp.h
+  };
   // Both html and body must get the corrected height explicitly: html is the
   // root element, and with its own CSS height (100%/-webkit-fill-available)
   // still resolving against the same undersized measurement, its overflow:
@@ -102,6 +111,15 @@ if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', fitWrapToScreen);
   window.visualViewport.addEventListener('scroll', fitWrapToScreen);
 }
+// On a cold launch, env(safe-area-inset-*) can read back as 0 on the very
+// first synchronous measurement (before iOS/WKWebView has finished settling
+// its own internal metrics for a freshly-opened standalone app), even though
+// the same probe correctly resolves moments later — and since that wrong
+// value gets "burned in" via the explicit style.height above, nothing
+// naturally re-triggers a correction unless the viewport genuinely resizes
+// again. Re-run shortly after load to catch and fix that case.
+setTimeout(fitWrapToScreen, 300);
+setTimeout(fitWrapToScreen, 1000);
 const scoreEl = document.getElementById('score');
 const bestEl = document.getElementById('best');
 const overlay = document.getElementById('overlay');

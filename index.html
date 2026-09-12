@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a2b4a">
 <title>Jumpy</title>
-<link rel="stylesheet" href="css/styles.css?v=1.0.7">
+<link rel="stylesheet" href="css/styles.css?v=1.0.8">
 </head>
 <body>
 <div id="loader">
@@ -87,7 +87,7 @@
     <div id="skinSelect"></div>
     <div id="skinHint"></div>
     <button id="startBtn">KICK OFF</button>
-    <div id="versionTag">v1.0.7</div>
+    <div id="versionTag">v1.0.8</div>
   </div>
   <pre id="debugInfo"></pre>
 </div>
@@ -161,7 +161,8 @@ function updateDebugInfo() {
     ' body:' + body.width.toFixed(0) + 'x' + body.height.toFixed(0) +
     (wrap ? ' wrap:' + wrap.width.toFixed(0) + 'x' + wrap.height.toFixed(0) + '@' + wrap.top.toFixed(0) + '-' + wrap.bottom.toFixed(0) : '') + '\n' +
     (canvasRect ? 'canvas:' + canvasRect.width.toFixed(0) + 'x' + canvasRect.height.toFixed(0) + '@' + canvasRect.top.toFixed(0) + '-' + canvasRect.bottom.toFixed(0) : '') +
-    ' safe T/R/B/L:' + ['top', 'right', 'bottom', 'left'].map(function(s) { return readEnvInset('safe-area-inset-' + s); }).join('/');
+    ' safe T/R/B/L:' + ['top', 'right', 'bottom', 'left'].map(function(s) { return readEnvInset('safe-area-inset-' + s); }).join('/') + '\n' +
+    'fitDebug:' + (window.__fitDebug ? JSON.stringify(window.__fitDebug) : 'never ran');
 }
 window.addEventListener('load', updateDebugInfo);
 window.addEventListener('resize', updateDebugInfo);
@@ -169,20 +170,20 @@ if (window.visualViewport) window.visualViewport.addEventListener('resize', upda
 setTimeout(updateDebugInfo, 1500); // catch the state after the boot sequence settles
 setInterval(updateDebugInfo, 500); // keep it live during gameplay too, not just at load
 </script>
-<script src="js/setup.js?v=1.0.7"></script>
-<script src="js/bots-race.js?v=1.0.7"></script>
-<script src="js/audio.js?v=1.0.7"></script>
-<script src="js/persist.js?v=1.0.7"></script>
-<script src="js/daily.js?v=1.0.7"></script>
-<script src="js/achievements.js?v=1.0.7"></script>
-<script src="js/cosmetics.js?v=1.0.7"></script>
-<script src="js/world-gen.js?v=1.0.7"></script>
-<script src="js/goal-game.js?v=1.0.7"></script>
-<script src="js/update.js?v=1.0.7"></script>
-<script src="js/death.js?v=1.0.7"></script>
-<script src="js/render-scene.js?v=1.0.7"></script>
-<script src="js/render-entities.js?v=1.0.7"></script>
-<script src="js/main-loop.js?v=1.0.7"></script>
-<script src="js/ui.js?v=1.0.7"></script>
+<script src="js/setup.js?v=1.0.8"></script>
+<script src="js/bots-race.js?v=1.0.8"></script>
+<script src="js/audio.js?v=1.0.8"></script>
+<script src="js/persist.js?v=1.0.8"></script>
+<script src="js/daily.js?v=1.0.8"></script>
+<script src="js/achievements.js?v=1.0.8"></script>
+<script src="js/cosmetics.js?v=1.0.8"></script>
+<script src="js/world-gen.js?v=1.0.8"></script>
+<script src="js/goal-game.js?v=1.0.8"></script>
+<script src="js/update.js?v=1.0.8"></script>
+<script src="js/death.js?v=1.0.8"></script>
+<script src="js/render-scene.js?v=1.0.8"></script>
+<script src="js/render-entities.js?v=1.0.8"></script>
+<script src="js/main-loop.js?v=1.0.8"></script>
+<script src="js/ui.js?v=1.0.8"></script>
 </body>
 </html>
