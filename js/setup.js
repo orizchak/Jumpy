@@ -54,13 +54,26 @@ const ctx = canvas.getContext('2d');
 const mainCtx = ctx;
 const W = canvas.width, H = canvas.height;
 
-// ---- HiDPI: render at device resolution (capped 2x) so retina phones and
-// scaled desktops get pixel-crisp output instead of CSS-upscaled blur ----
-const DPR = Math.min(window.devicePixelRatio || 1, 2);
-if (DPR !== 1) {
-  canvas.width = Math.round(W * DPR);
-  canvas.height = Math.round(H * DPR);
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+// ---- HiDPI: render at (device pixel ratio × on-screen cover-scale) so the
+// canvas stays pixel-crisp everywhere, not just relative to the display's
+// own pixel density. The logical world above is sized once from the
+// screen's ASPECT RATIO (capped at 1280x960), so any viewport bigger than
+// that — a maximized desktop window, and especially fullscreen on a full
+// monitor — gets stretched further still by fitWrapToScreen's own CSS
+// scale below; a fixed devicePixelRatio-only backing store left every such
+// view visibly soft. Re-applied every time fitWrapToScreen runs (resize,
+// visualViewport changes, entering/exiting fullscreen) since that cover
+// scale changes with the viewport, not just once at load. Capped well
+// above what any real screen needs, purely as a memory safety net for
+// extreme ultrawide+retina combinations.
+let canvasDPR = 0; // 0 guarantees the first call below always applies
+function applyCanvasResolution(coverScale) {
+  const dpr = Math.min((window.devicePixelRatio || 1) * Math.max(1, coverScale), 4);
+  if (Math.abs(dpr - canvasDPR) < 0.02) return; // skip sub-pixel resize churn
+  canvasDPR = dpr;
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
 // Scale the whole game (canvas + HUD overlays together) to fill the viewport.
@@ -95,6 +108,7 @@ function fitWrapToScreen() {
   const s = Math.max(vp.w / W, vp.h / H);
   wrapEl.style.transform = 'scale(' + s + ')';
   wrapEl.style.transformOrigin = '50% 50%';
+  applyCanvasResolution(s);
 }
 fitWrapToScreen();
 window.addEventListener('resize', fitWrapToScreen);
