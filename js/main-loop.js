@@ -12,6 +12,7 @@ function draw() {
   drawBots();
   drawPlayerRaceTag();
   drawRaceProgress();
+  drawGhost();
   drawBallTrail();
   drawBall();
   drawTrophy();

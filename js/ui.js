@@ -219,6 +219,7 @@ function showGameOver() {
   totalDistanceClimbed += distM;
   if (!shieldUsedThisRun) unlockAchievement('no_shield');
   if (gameMode === 'daily') recordDailyResult(score);
+  saveGhostIfBest(score);
   checkAchievements();
   saveStats();
   const standings = raceStandings();

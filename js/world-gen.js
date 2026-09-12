@@ -187,6 +187,8 @@ function spawnPlatform(y, diff, climbed) {
 
 function resetGame() {
   applyDailySeedIfNeeded();
+  loadActiveGhost();
+  startGhostRecording();
   totalRuns++;
   shieldUsedThisRun = false;
   saveStats();

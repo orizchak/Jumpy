@@ -401,6 +401,25 @@ function drawBots() {
   ctx.globalAlpha = 1;
 }
 
+// Faint trace of the best past run on this exact seed (daily/challenge only —
+// see ghost.js). Reuses the player's own ball art at low alpha and no face
+// direction bias so it never gets mistaken for a live opponent.
+function drawGhost() {
+  const pos = ghostScreenPos();
+  if (!pos) return;
+  ctx.save();
+  ctx.globalAlpha = 0.3;
+  ctx.translate(pos.x, pos.y);
+  drawTriondaCharacter(ball.r, 1, 0);
+  ctx.restore();
+  ctx.save();
+  ctx.globalAlpha = 0.6;
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('👻', pos.x, pos.y - ball.r - 8);
+  ctx.restore();
+}
+
 function drawBallTrail() {
   // fading ghost circles behind the ball; stronger when moving fast, golden during boost
   const speed = Math.abs(ball.vx) + Math.abs(ball.vy);

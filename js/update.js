@@ -423,6 +423,7 @@ function update() {
 
   // height-based score floor, evaluated every frame (same baseline as the bots)
   const inScreenClimb = Math.max(0, (H - 100) - ball.y);
+  tickGhost(cameraY + inScreenClimb);
   score = Math.max(score, heightPointsFromPx(cameraY + inScreenClimb) - scorePenalty);
   scoreEl.textContent = score;
   if (score > best) { best = score; bestEl.textContent = best; }
