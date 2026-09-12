@@ -97,15 +97,19 @@ function fitWrapToScreen() {
   document.body.style.height = vp.h + 'px';
   wrapEl.style.width = W + 'px';
   wrapEl.style.height = H + 'px';
-  // Scale to COVER the viewport, not just fit inside it: the canvas's logical
-  // aspect ratio is chosen to closely match the screen's at load (see
-  // fitLogicalSize above), but it's never pixel-perfect — a scale-to-fit
-  // (Math.min) leaves that tiny leftover sliver as a visible gap on one axis.
-  // Math.max instead over-scales just enough to guarantee full coverage,
-  // symmetrically cropping an imperceptible amount (body's overflow:hidden
-  // plus this element's centered transform-origin keep it centered) rather
-  // than ever leaving blank space.
-  const s = Math.max(vp.w / W, vp.h / H);
+  // Scale to FIT inside the viewport (never crop): fitLogicalSize picks W/H
+  // to closely match the screen's aspect ratio at load, but caps out at
+  // 1280x960 for very wide or very tall/narrow screens — a maximized
+  // desktop window or fullscreen on a wide monitor easily exceeds that
+  // capped aspect ratio. A cover scale (Math.max) used to fill such a
+  // screen completely, but did so by cropping the taller/narrower axis —
+  // and every HUD control (mute, fullscreen, score, KICK OFF) is pinned
+  // near an edge, so that crop could push them fully off-screen. Math.min
+  // guarantees neither axis ever crops; any leftover space becomes a thin
+  // centered gap (body's own matching sky-gradient background shows
+  // through) instead. In the common near-matching-aspect case the two
+  // formulas barely differ, so this costs nothing there.
+  const s = Math.min(vp.w / W, vp.h / H);
   wrapEl.style.transform = 'scale(' + s + ')';
   wrapEl.style.transformOrigin = '50% 50%';
   applyCanvasResolution(s);
