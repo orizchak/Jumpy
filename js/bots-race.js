@@ -417,7 +417,15 @@ let hudDistM = 0;
 let lastMilestone = 0;
 const livesDisplayEl = document.getElementById('livesDisplay');
 const flagCounterEl = document.getElementById('flagCounter');
+// Tracks what's currently painted so the per-frame call from update() (a
+// safety net against any path that changes `lives` without re-rendering)
+// can skip the DOM write on the ~59 out of every 60 frames where nothing
+// actually changed, instead of doing a full innerHTML rebuild every tick.
+let renderedLivesKey = null;
 function renderLives() {
+  const key = racing() ? 'inf' : lives + ':' + Math.max(peakLives, 3);
+  if (key === renderedLivesKey) return;
+  renderedLivesKey = key;
   if (racing()) {
     livesDisplayEl.innerHTML = '⚽ ∞';
     return;
@@ -431,6 +439,8 @@ function renderLives() {
   }
   livesDisplayEl.innerHTML = html;
 }
+renderLives(); // paint the starting 3 immediately at load, before any match begins
+
 function renderFlagCounter() {
   flagCounterEl.textContent = '🚩 ' + flagsCollectedCount;
   const breakdownEl = document.getElementById('flagBreakdown');

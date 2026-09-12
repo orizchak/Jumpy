@@ -234,6 +234,7 @@ function resetGame() {
   flagsCollectedCount = 0;
   flagCountsByCountry = {};
   reviveGraceTimer = 0;
+  renderedLivesKey = null; // force the reset above to actually repaint, even if it matches the last run's final state
   renderLives();
   renderFlagCounter();
   matchClockEl.textContent = '0:00';
