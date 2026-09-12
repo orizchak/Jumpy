@@ -94,14 +94,19 @@
 
 
 <script>
-// Wallet browser extensions (MetaMask, Brave Wallet, Coinbase Wallet, ...) and other
-// content scripts inject code into every page and sometimes throw while doing it —
-// that has nothing to do with the game, so don't scare players with it. Browsers hide
-// the real details of such cross-origin/extension errors behind the generic message
-// "Script error." with line/col zeroed out; every genuine error from our own same-origin
-// files always carries a real filename and line number, so that opaque shape is itself
-// a reliable signal this isn't ours.
-const THIRD_PARTY_ERROR_PATTERN = /\bethereum\b|\bweb3\b|\bsolana\b/i;
+// Wallet browser extensions (MetaMask, Brave Wallet, Coinbase Wallet, ...) and
+// browser-internal compatibility shims (e.g. window.__firefox__ on some iOS
+// browsers) inject code/globals into every page and sometimes throw while
+// doing it — that has nothing to do with the game, so don't scare players
+// with it. Rather than chase every individual name one at a time as new ones
+// turn up, match the general SHAPE: browser/extension internals are almost
+// always dunder-wrapped (__foo__) or a handful of known wallet globals — our
+// own code never uses either. Browsers also hide the real details of
+// cross-origin/extension errors behind the generic message "Script error."
+// with line/col zeroed out; every genuine error from our own same-origin
+// files always carries a real filename and line number, so that opaque shape
+// is itself a reliable signal this isn't ours.
+const THIRD_PARTY_ERROR_PATTERN = /\bethereum\b|\bweb3\b|\bsolana\b|__\w+__/i;
 window.addEventListener('error', function(e) {
   const isOpaque = e.message === 'Script error.' && !e.filename && !e.lineno;
   if (isOpaque || THIRD_PARTY_ERROR_PATTERN.test(e.message) || THIRD_PARTY_ERROR_PATTERN.test(e.filename || '')) return;
