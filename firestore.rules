@@ -1,0 +1,30 @@
+rules_version = '2';
+// Paste this into Firebase console → Firestore Database → Rules.
+//
+// Scores live in two kinds of collections, both anonymous (no auth):
+//   scores_classic              — all-time global leaderboard
+//   scores_daily_YYYYMMDD       — one fresh collection per calendar day
+// A doc can only ever be created (never edited or deleted), and must be
+// exactly {name, score, ts} with a plausible score and a server-stamped
+// timestamp. This blocks casual tampering but NOT a determined scripted
+// attacker (there's no App Check / auth here) — acceptable for a casual
+// game leaderboard, not a competitive one with real stakes.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{collectionId}/{doc} {
+      allow read: if collectionId == 'scores_classic'
+        || collectionId.matches('^scores_daily_[0-9]{8}$');
+      allow create: if (collectionId == 'scores_classic'
+          || collectionId.matches('^scores_daily_[0-9]{8}$'))
+        && request.resource.data.keys().hasOnly(['name', 'score', 'ts'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 16
+        && request.resource.data.score is int
+        && request.resource.data.score > 0
+        && request.resource.data.score < 200000
+        && request.resource.data.ts == request.time;
+      allow update, delete: if false;
+    }
+  }
+}

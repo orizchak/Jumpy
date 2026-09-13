@@ -237,6 +237,7 @@ function showGameOver() {
     <p>Time: <b>${elapsed}</b> &nbsp;(best ${formatMatchTime(bestTimeMs)})${newTimeRecord ? ' 🏆' : ''}</p>
     <p>🚩 ${flagsCollectedCount} flags collected</p>
     ${gameMode === 'challenge' ? challengeLine : nearMissLine}
+    ${buildLeaderboardSubmitHtml(gameMode, score)}
     <button id="playAgainBtn">Play Again</button>
     <button id="shareBtn" class="secondaryBtn">📋 Share</button>
     <button id="menuBtn" class="secondaryBtn">Menu</button>
@@ -252,6 +253,7 @@ function showGameOver() {
   document.getElementById('menuBtn').addEventListener('click', function() {
     try { backToMenu(); } catch (err) { showRealError(err); }
   });
+  wireLeaderboardSubmit(gameMode, score);
 }
 
 // The menu HTML is saved so end screens can return to it (mode selection included).
@@ -297,6 +299,9 @@ function wireMenu() {
         chip.classList.add('selected');
       } catch (err) { showRealError(err); }
     });
+  });
+  document.getElementById('leaderboardBtn').addEventListener('click', function() {
+    try { openLeaderboard('classic'); } catch (err) { showRealError(err); }
   });
   renderMute();
   muteBtn.classList.add('show'); // visible on the opening menu
