@@ -29,6 +29,26 @@ function leaderboardCollectionFor(mode) {
   return mode === 'daily' ? 'scores_daily_' + leaderboardDayKey() : 'scores_classic';
 }
 
+// A top-10 read doesn't need to be second-fresh, and the modal can get opened
+// and tab-switched several times a minute — caching keeps that snappy and
+// keeps read volume off the Firestore free-tier quota. Kept in localStorage
+// (not just memory) so it also survives a full page reload.
+const LEADERBOARD_CACHE_TTL_MS = 60 * 1000;
+const LEADERBOARD_CACHE_KEY = 'jumpyLbCache';
+let lbCache = (function() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LEADERBOARD_CACHE_KEY) || '{}');
+    return (raw && typeof raw === 'object') ? raw : {};
+  } catch (e) { return {}; }
+})();
+function saveLbCache() {
+  try { localStorage.setItem(LEADERBOARD_CACHE_KEY, JSON.stringify(lbCache)); } catch (e) { /* ignore */ }
+}
+function invalidateLbCache(mode) {
+  delete lbCache[leaderboardCollectionFor(mode)];
+  saveLbCache();
+}
+
 function loadSavedPlayerName() {
   try { return (localStorage.getItem(LEADERBOARD_NAME_KEY) || '').slice(0, 16); } catch (e) { return ''; }
 }
@@ -63,6 +83,7 @@ async function submitScoreToLeaderboard(mode, name, score) {
       ts: firebase.firestore.FieldValue.serverTimestamp()
     });
     savePlayerName(cleanName);
+    invalidateLbCache(mode); // so the next view reflects this submission right away
     return { ok: true };
   } catch (e) {
     return { ok: false, reason: 'network' };
@@ -73,14 +94,20 @@ async function submitScoreToLeaderboard(mode, name, score) {
 // so callers can tell "no scores yet" apart from "couldn't load".
 async function fetchTopScores(mode, limit) {
   if (!lbDb) return null;
+  const key = leaderboardCollectionFor(mode);
+  const cached = lbCache[key];
+  if (cached && (Date.now() - cached.ts) < LEADERBOARD_CACHE_TTL_MS) return cached.rows;
   try {
-    const snap = await lbDb.collection(leaderboardCollectionFor(mode))
+    const snap = await lbDb.collection(key)
       .orderBy('score', 'desc')
       .limit(limit || 10)
       .get();
-    return snap.docs.map(function(doc) { return doc.data(); });
+    const rows = snap.docs.map(function(doc) { return doc.data(); });
+    lbCache[key] = { rows: rows, ts: Date.now() };
+    saveLbCache();
+    return rows;
   } catch (e) {
-    return null;
+    return cached ? cached.rows : null; // serve stale data over nothing if we have it
   }
 }
 
